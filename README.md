@@ -21,23 +21,15 @@ git push
 ```
 O GitHub Pages atualiza sozinho em ~1 min.
 
-## Configurar o Supabase (uma vez)
+## Supabase
 
-Ver **[SUPABASE.md](SUPABASE.md)**. Resumo:
+Projeto: `dgkdpczzhvyldpvwkutk` · URL `https://dgkdpczzhvyldpvwkutk.supabase.co`.
+Credenciais já aplicadas em `index.html` (`SB_URL` / `SB_KEY` — a anon key é pública, protegida por Auth/RLS).
 
-1. Criar projeto no Supabase — região **South America (São Paulo)**.
-2. Authentication → Providers → **Email** habilitado. Para testes, desabilite
-   "Confirm email" (Authentication → Providers → Email → *Confirm email* OFF).
-3. Copiar **Project URL** e **anon public key** (Settings → API).
-4. Em `index.html`, substituir:
-   - `__SUPABASE_URL__`  → a Project URL
-   - `__SUPABASE_ANON_KEY__` → a anon key
-   (a `anon key` pode ser pública — é protegida por RLS/Auth.)
-5. `git commit` + `git push`.
-6. Aceitar o **DPA** do Supabase (Settings → Legal).
-
-Enquanto os dois placeholders não forem trocados, o app roda em **modo local de testes**
-(conta `ricardo@controldoctor.app` / `123456`, com dados de exemplo).
+Falta configurar no painel do Supabase (ver **[SUPABASE.md](SUPABASE.md)**):
+- Authentication → Providers → Email → **"Confirm email" = OFF** (para testes)
+- Authentication → URL Configuration → Site URL = `https://marcosmartins86.github.io/controldoctor/`
+- Project Settings → Legal → aceitar o **DPA**
 
 ## Entregar uma conta a um médico
 

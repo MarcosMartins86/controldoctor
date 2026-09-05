@@ -237,7 +237,7 @@
 <div id="modal-root"></div>
 <div id="toast" class="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.min.js"></script>
 <script src="cbhpm.js"></script>
 <script>
 /* ============================================================
@@ -251,8 +251,8 @@ const LS_DB = 'controldoctor.db.v2';
 const LS_SESSION = 'controldoctor.session.v2';
 
 /* ---------------- Supabase ---------------- */
-const SB_URL = '__SUPABASE_URL__';
-const SB_KEY = '__SUPABASE_ANON_KEY__';
+const SB_URL = 'https://dgkdpczzhvyldpvwkutk.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRna2RwY3p6aHZ5bGRwdndrdXRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2Mjc0NzUsImV4cCI6MjEwNDIwMzQ3NX0.nRtCXtrFdBdqJLp_RF9gs9MKE0YNK89cizVW94zAgKQ';
 const SB_ON  = /^https:\/\/.+\.supabase\.co$/.test(SB_URL) && SB_KEY.length > 20;
 const sb = SB_ON ? window.supabase.createClient(SB_URL, SB_KEY, { auth:{ persistSession:true, autoRefreshToken:true } }) : null;
 
