@@ -1,0 +1,2277 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ControlDoctor</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f766e'/%3E%3Ctext x='16' y='23' font-family='Arial,Helvetica,sans-serif' font-size='16' font-weight='700' fill='white' text-anchor='middle'%3ECD%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#f4f6f8; --surface:#ffffff; --surface-2:#f8fafc; --border:#e3e8ee;
+    --text:#1c2733; --muted:#64748b; --accent:#0f766e; --accent-soft:#e6f4f2;
+    --indigo:#4f46e5; --amber:#b45309; --amber-soft:#fef3c7;
+    --red:#b91c1c; --red-soft:#fee2e2; --green:#15803d; --green-soft:#dcfce7;
+    --blue:#1d4ed8; --blue-soft:#dbeafe;
+    --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.1);
+    --radius:10px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.45}
+  h1,h2,h3,h4{margin:0;font-weight:650}
+  a{color:var(--accent)}
+  button{font-family:inherit;font-size:14px;cursor:pointer}
+  input,select,textarea{font-family:inherit;font-size:14px}
+
+  /* ---------- Login ---------- */
+  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;overflow-y:auto;
+    background:linear-gradient(135deg,#0f766e 0%,#155e63 45%,#1e3a8a 100%)}
+  .login-card{background:var(--surface);border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,.25);width:100%;max-width:400px;padding:32px}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+  .brand-mark{width:34px;height:34px;border-radius:9px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800}
+  .brand-name{font-size:19px;font-weight:750;letter-spacing:-.01em}
+  .brand-name span{color:var(--accent)}
+  .login-sub{color:var(--muted);font-size:13px;margin:6px 0 22px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:5px}
+  .field input,.field select,.field textarea{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 15px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-weight:600}
+  .btn:hover{background:var(--surface-2)}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;width:100%;padding:10px}
+  .btn-primary:hover{background:#0c5f58}
+  .btn-sm{padding:5px 10px;font-size:12.5px;border-radius:7px}
+  .btn-ghost{border-color:transparent;background:transparent;color:var(--muted)}
+  .btn-danger{color:var(--red);border-color:var(--red-soft)}
+  .btn-danger:hover{background:var(--red-soft)}
+  .demo-box{margin-top:18px;padding:13px;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;font-size:12.5px;color:var(--muted)}
+  .demo-box b{color:var(--text)}
+  .acct{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface);cursor:pointer;margin-top:7px}
+  .acct:hover{background:var(--accent-soft);border-color:var(--accent)}
+  .acct .who{display:flex;flex-direction:column;min-width:0}
+  .acct .who b{color:var(--text);font-size:13px}
+  .acct .who span{font-size:11.5px;color:var(--muted)}
+  .acct .role{font-size:11px;color:var(--muted);white-space:nowrap;text-align:right}
+  .link-btn{background:none;border:none;color:var(--accent);font-weight:600;padding:0}
+  .err{color:var(--red);font-size:12.5px;margin-top:8px;min-height:16px}
+
+  /* ---------- Shell ---------- */
+  .shell{display:flex;min-height:100vh}
+  .sidebar{width:222px;flex-shrink:0;background:#0e2a2a;color:#c9d9d7;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+  .sidebar .brand{padding:18px 18px 14px;color:#fff}
+  .sidebar .brand-name{color:#fff;font-size:17px}
+  .sidebar .brand-name span{color:#5eead4}
+  .nav-group{padding:6px 10px}
+  .nav-group-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:#5f807d;padding:12px 10px 6px}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:#c9d9d7;text-decoration:none;font-weight:550;font-size:13.5px;border:none;background:none;width:100%;text-align:left}
+  .nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+  .nav-item.active{background:var(--accent);color:#fff}
+  .nav-item svg{width:17px;height:17px;flex-shrink:0;opacity:.9}
+  .sidebar-foot{margin-top:auto;padding:14px;border-top:1px solid rgba(255,255,255,.08);font-size:12px;color:#8ca9a6}
+
+  .main{flex:1;min-width:0;display:flex;flex-direction:column}
+  .topbar{height:56px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 22px;position:sticky;top:0;z-index:20}
+  .topbar .who{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+  .avatar{width:30px;height:30px;border-radius:50%;background:var(--indigo);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px}
+  .content{padding:24px 26px;max-width:1180px;width:100%}
+  .page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
+  .page-head h1{font-size:20px}
+  .page-head p{margin:3px 0 0;color:var(--muted);font-size:13px}
+
+  /* ---------- Cards / KPIs ---------- */
+  .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)}
+  .kpi .label{font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px}
+  .kpi .value{font-size:22px;font-weight:730;letter-spacing:-.02em}
+  .kpi .hint{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .kpi.klick{cursor:pointer;transition:box-shadow .12s,transform .12s}
+  .kpi.klick:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(16,24,40,.12)}
+  .kpi.accent .value{color:var(--accent)}
+  .kpi.amber .value{color:var(--amber)}
+  .kpi.red .value{color:var(--red)}
+  .kpi.green .value{color:var(--green)}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:18px}
+  .card-head{padding:13px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .card-head h3{font-size:14.5px}
+  .card-body{padding:14px 16px}
+  .card-body.flush{padding:0}
+
+  /* ---------- Tables ---------- */
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:650;padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap}
+  td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:var(--surface-2)}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  .t-wrap{overflow-x:auto}
+  .row-click{cursor:pointer}
+  .sub-row td{background:var(--surface-2);border-bottom:1px solid var(--border)}
+
+  /* ---------- Badges ---------- */
+  .badge{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:20px;font-size:11.5px;font-weight:650;white-space:nowrap}
+  .b-green{background:var(--green-soft);color:var(--green)}
+  .b-amber{background:var(--amber-soft);color:var(--amber)}
+  .b-red{background:var(--red-soft);color:var(--red)}
+  .b-blue{background:var(--blue-soft);color:var(--blue)}
+  .b-gray{background:#eef1f4;color:var(--muted)}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+
+  /* ---------- Toolbar / filters ---------- */
+  .toolbar{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-bottom:14px}
+  .toolbar input,.toolbar select{padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface)}
+  .toolbar .search{min-width:180px}
+  .toolbar .flt-range{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);white-space:nowrap}
+  .toolbar .flt-range input{color:var(--text)}
+  .toolbar .rng{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);white-space:nowrap}
+  .toolbar .rng input{color:var(--text)}
+  .spacer{flex:1}
+  .bulk-bar{display:flex;align-items:center;gap:12px;background:var(--accent-soft);border:1px solid var(--accent);border-radius:var(--radius);padding:9px 14px;margin-bottom:12px;font-size:13px}
+  tr.row-sel td{background:var(--accent-soft)}
+  .tbl-compact{font-size:12.5px}
+  .tbl-compact th,.tbl-compact td{padding:8px 8px}
+  .tbl-compact .hint-txt{margin-top:1px;font-size:11px}
+  .chev{border:none;background:none;cursor:pointer;font-size:20px;line-height:1;color:var(--muted);padding:0 4px}
+  .chev:hover{color:var(--accent)}
+
+  /* ---------- Resumo executivo ---------- */
+  .insights{background:linear-gradient(180deg,var(--accent-soft),var(--surface));border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--radius);padding:13px 16px;margin-bottom:18px}
+  .insights h3{font-size:13px;margin-bottom:7px;color:var(--accent);text-transform:uppercase;letter-spacing:.04em}
+  .insights ul{margin:0;padding-left:18px}
+  .insights li{margin:4px 0;font-size:13px;line-height:1.45}
+  .sec-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .hbars{display:flex;flex-direction:column;gap:9px;padding:2px}
+  .hbar{display:grid;grid-template-columns:minmax(110px,150px) 1fr auto;align-items:center;gap:10px}
+  .hbar-lbl{font-size:12px;font-weight:600;line-height:1.25;min-width:0;overflow:hidden}
+  .hbar-lbl .hbar-sub{display:block;font-weight:400;color:var(--muted);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hbar-track{height:15px;background:var(--surface-2);border-radius:5px;overflow:hidden}
+  .hbar-fill{height:100%;border-radius:5px;min-width:2px}
+  .hbar-val{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .mlegend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;margin-top:8px;color:var(--muted)}
+  .mlegend span{display:inline-flex;align-items:center;gap:6px}
+  .mlegend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+  @media(max-width:820px){ .sec-grid{grid-template-columns:1fr} }
+
+  /* ---------- Modal ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(15,23,32,.45);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:100;overflow-y:auto}
+  .modal{background:var(--surface);border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.3);width:100%;max-width:720px;margin:auto}
+  .modal.lg{max-width:920px}
+  .modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+  .modal-head h3{font-size:16px}
+  .modal-body{padding:18px 20px;max-height:calc(100vh - 220px);overflow-y:auto}
+  .modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:9px;background:var(--surface-2);border-radius:0 0 14px 14px}
+  .x-btn{border:none;background:none;font-size:20px;color:var(--muted);line-height:1;padding:4px}
+
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+  .form-grid .full{grid-column:1/-1}
+  .form-grid label,.stack label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px}
+  .form-grid input,.form-grid select,.form-grid textarea,.stack input,.stack select{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)}
+  .form-grid input:focus,.form-grid select:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+
+  .proc-table th,.proc-table td{padding:7px 8px}
+  .proc-table input,.proc-table select{width:100%;padding:6px 7px;border:1px solid var(--border);border-radius:6px}
+  .info-dot{flex:none;width:18px;height:18px;padding:0;border:none;border-radius:50%;background:var(--indigo);color:#fff;font:italic 700 11px/18px Georgia,serif;text-align:center;cursor:pointer}
+  .info-dot:hover{filter:brightness(1.15)}
+  .cbhpm-cell{position:relative}
+  .cbhpm-drop{position:absolute;top:100%;left:0;right:0;z-index:30;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 30px rgba(0,0,0,.16);max-height:240px;overflow-y:auto;margin-top:3px}
+  .cbhpm-opt{padding:7px 10px;cursor:pointer;font-size:12.5px;border-bottom:1px solid var(--border)}
+  .cbhpm-opt:hover,.cbhpm-opt.hi{background:var(--accent-soft)}
+  .cbhpm-opt .code{font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
+
+  .empty{text-align:center;padding:44px 20px;color:var(--muted)}
+  .empty svg{width:40px;height:40px;opacity:.4;margin-bottom:10px}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:12px;margin:3px 4px 3px 0}
+  .checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px}
+  .checks label{display:flex;align-items:center;gap:7px;font-weight:500;color:var(--text);font-size:13px;margin:0;padding:5px 6px;border-radius:6px}
+  .checks label:hover{background:var(--surface-2)}
+  .mini-bar{height:8px;border-radius:5px;background:var(--surface-2);overflow:hidden;display:flex}
+  .mini-bar span{display:block;height:100%}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#0e2a2a;color:#fff;padding:11px 18px;border-radius:9px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.3);z-index:200;opacity:0;transition:opacity .2s,transform .2s}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+  .hint-txt{font-size:12px;color:var(--muted);margin-top:4px}
+
+  /* ---------- Convênio cards ---------- */
+  .conv-grid{display:flex;flex-direction:column;gap:11px}
+  .conv-card{background:var(--surface);border:1px solid var(--border);border-left:5px solid var(--cc,#0f766e);border-radius:var(--radius);box-shadow:var(--shadow);padding:13px 18px;display:flex;align-items:center;gap:22px;cursor:pointer;transition:box-shadow .15s,transform .15s}
+  .conv-card:hover{box-shadow:0 6px 18px rgba(16,24,40,.13);transform:translateY(-1px)}
+  .conv-card .cc-head{flex-shrink:0;width:150px}
+  .conv-card .cc-name{font-weight:760;font-size:15px;color:var(--cc,#0f766e);line-height:1.25;word-break:break-word}
+  .conv-card .cc-sub{font-size:12px;color:var(--muted);margin-top:3px}
+  .conv-card .cc-edit{margin-top:7px;font-size:11.5px;color:var(--muted);opacity:0;transition:opacity .15s}
+  .conv-card:hover .cc-edit{opacity:1}
+  .cc-metrics{flex:1;min-width:0;display:flex;flex-direction:row;gap:14px}
+  .cc-metric{flex:1;min-width:0;display:flex;gap:10px;align-items:stretch}
+  .cc-metric .mbar{width:5px;border-radius:3px;flex-shrink:0}
+  .cc-metric .mtxt{flex:1;min-width:0}
+  .cc-metric .mlabel{font-weight:600;font-size:11.5px;line-height:1.3;color:var(--muted)}
+  .cc-metric .mval{display:flex;align-items:baseline;gap:9px;font-variant-numeric:tabular-nums;margin-top:3px}
+  .cc-metric .mval .mn{font-weight:750;font-size:15px}
+  .cc-metric .mval .mv{font-weight:650;font-size:12.5px;color:var(--muted)}
+  .hosp-card .cc-head{width:220px}
+  .cc-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+  .cc-tag{font-size:10.5px;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:1px 7px;line-height:1.6;white-space:nowrap}
+
+  /* ---------- Modal tabs / OCR ---------- */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap}
+  .tab-btn{border:none;background:none;padding:9px 13px;font-weight:600;font-size:13px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab-btn:hover{color:var(--text)}
+  .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab-btn .tnum{display:inline-flex;width:18px;height:18px;border-radius:50%;background:var(--surface-2);align-items:center;justify-content:center;font-size:11px;margin-right:6px;vertical-align:middle}
+  .tab-btn.active .tnum{background:var(--accent-soft);color:var(--accent)}
+  .ocr-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface-2);border:1px dashed var(--border);border-radius:9px;padding:10px 12px;margin-bottom:14px}
+  .ocr-bar .hint-txt{margin:0}
+  .modal-body textarea{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:14px;resize:vertical;line-height:1.5}
+  .modal-body textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+
+  @media(max-width:820px){
+    .conv-card{flex-direction:column;align-items:stretch;gap:12px}
+    .conv-card .cc-head{width:auto}
+    .cc-metrics{flex-direction:column}
+    .sidebar{position:fixed;left:-240px;z-index:50;transition:left .2s}
+    .sidebar.open{left:0}
+    .form-grid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modal-root"></div>
+<div id="toast" class="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="cbhpm.js"></script>
+<script>
+/* ============================================================
+   ControlDoctor (2M Consultoria)
+   Login/autenticação: Supabase.  Dados: neste navegador (localStorage),
+   com exportação/importação de backup. Nenhum dado de paciente vai
+   para servidor nesta versão.
+   ============================================================ */
+
+const LS_DB = 'controldoctor.db.v2';
+const LS_SESSION = 'controldoctor.session.v2';
+
+/* ---------------- Supabase ---------------- */
+const SB_URL = '__SUPABASE_URL__';
+const SB_KEY = '__SUPABASE_ANON_KEY__';
+const SB_ON  = /^https:\/\/.+\.supabase\.co$/.test(SB_URL) && SB_KEY.length > 20;
+const sb = SB_ON ? window.supabase.createClient(SB_URL, SB_KEY, { auth:{ persistSession:true, autoRefreshToken:true } }) : null;
+
+/* ---------------- utils ---------------- */
+const $ = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = n => (Number(n)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const money0 = n => (Number(n)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
+const todayISO = () => new Date().toISOString().slice(0,10);
+function fmtDate(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }
+function fmtMonth(iso){ if(!iso) return '—'; const [y,m]=iso.split('-'); return `${['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+m-1]}/${y}`; }
+function daysSince(iso){ if(!iso) return 0; return Math.floor((Date.now()-new Date(iso+'T00:00:00'))/86400000); }
+function fmtCbhpm(c){ c=String(c||'').replace(/\D/g,''); if(c.length<8) return c; return `${c[0]}.${c.slice(1,3)}.${c.slice(3,5)}.${c.slice(5,7)}-${c.slice(7)}`; }
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200); }
+
+/* LGPD / minimização: nomes de paciente são reduzidos a iniciais antes de gravar.
+   "Maria Jose da Silva Chagas" -> "M.J.S.C."  ·  "PAC-042" ou "João" -> mantidos.
+   Idempotente: reprocessar um valor já reduzido não muda nada. */
+function acronimoNome(nome){
+  const s=String(nome||'').trim();
+  if(!s) return '';
+  if(/\d/.test(s)) return s;                                  // contém número -> é código, não mexe
+  const STOP=/^(de|da|do|das|dos|e|di|del|van|von|la|le|dos)$/i;
+  const signif=s.split(/\s+/).filter(w=>w.length>0 && !STOP.test(w));
+  if(signif.length<2) return s;                               // 1 palavra significativa -> mantém
+  return signif.map(w=>w[0].toUpperCase()).join('.')+'.';
+}
+
+/* ---------------- CBHPM reference ---------------- */
+const CBHPM = (window.CBHPM_DATA||[]).map(x=>({codigo:x.c, nome:x.d, porte:x.p}));
+const CBHPM_BY_CODE = Object.fromEntries(CBHPM.map(x=>[x.codigo,x]));
+function cbhpmSearch(q){
+  q=(q||'').trim().toLowerCase();
+  if(!q) return [];
+  const digits=q.replace(/\D/g,'');
+  const out=[];
+  for(const p of CBHPM){
+    if((digits && p.codigo.includes(digits)) || (q.length>=3 && p.nome.toLowerCase().includes(q))){
+      out.push(p); if(out.length>=40) break;
+    }
+  }
+  return out;
+}
+
+/* ---------------- storage ---------------- */
+let DB = load();
+function emptyDB(){ return { seq:0, medicos:[], convenios:[], hospitais:[], cirurgias:[], procedimentos:[] }; }
+function load(){
+  let db;
+  try{ const raw=localStorage.getItem(LS_DB); if(raw) db=JSON.parse(raw); }catch(e){}
+  if(!db) db = SB_ON ? emptyDB() : seed();   // com login real, começa vazio (sem dados de exemplo)
+  // minimização: garante que nenhum nome completo fique gravado (dados antigos incluídos)
+  (db.cirurgias||[]).forEach(c=>{ if(c.paciente) c.paciente=acronimoNome(c.paciente); });
+  return db;
+}
+function save(){ localStorage.setItem(LS_DB, JSON.stringify(DB)); }
+function uid(p='id'){ DB.seq=(DB.seq||0)+1; return p+DB.seq; }
+
+/* ---------------- seed ---------------- */
+function seed(){
+  const db = { seq:0, medicos:[], convenios:[], hospitais:[], cirurgias:[], procedimentos:[] };
+  const mkId = p => { db.seq++; return p+db.seq; };
+
+  const med = { id:mkId('med'), nome:'Dr. Ricardo Menezes', email:'ricardo@controldoctor.app', senha:'123456', crm:'CRM-PE 12345', esp:'Ortopedia e Traumatologia' };
+  db.medicos.push(med);
+  db.medicos.push({ id:mkId('med'), nome:'Dra. Helena Prado', email:'helena@controldoctor.app', senha:'123456', crm:'CRM-PE 54321', esp:'Cirurgia Geral' });
+
+  const redes = {'Apami':'Apami','H. Maria Lucinda':'Rede HML','HER':'Rede Cirúrgica','HSJ':'Ortocentro','HSM':'Recife Ortopedia','Max Day':'Max Day','Memorial São José':'Rede Cirúrgica','Memorial Star':'Rede Cirúrgica','RHP':'IOT','Unimed I':'Unimed','Unimed II':'Unimed','Unimed III':'Unimed','HGMI':'Unimed','HSE':'Coopevita','HST':'HST','SOS':'SOS','HF':'HF'};
+  const hMap={};
+  Object.keys(redes).forEach(nome=>{ const id=mkId('hos'); hMap[nome]=id; db.hospitais.push({id,medicoId:med.id,nome,rede:redes[nome]}); });
+
+  const convNames=['Amil','Bradesco Saúde','Geap','Sulamérica','Unimed','Cassi','Postal Saúde','Gama Saúde','Camed','Petrobras','Particular'];
+  const cMap={};
+  const allH=Object.values(hMap);
+  convNames.forEach(nome=>{
+    const id=mkId('con'); cMap[nome]=id;
+    // cada convênio atende um subconjunto de hospitais
+    const atende = nome==='Particular' ? allH.slice() :
+      allH.filter((_,i)=> (i + nome.length) % 3 !== 0);
+    db.convenios.push({id,medicoId:med.id,nome,hospitalIds:atende});
+  });
+
+  function cir(o,procs){
+    const id=mkId('cir');
+    const prontuario = o.prontuario || String(48231 + db.cirurgias.length*206);
+    db.cirurgias.push(Object.assign({id,medicoId:med.id},o,{prontuario}));
+    procs.forEach(p=>{
+      const ref=CBHPM_BY_CODE[p.codigo]||{};
+      db.procedimentos.push(Object.assign({
+        id:mkId('prc'), cirurgiaId:id, codigo:p.codigo, nome:ref.nome||p.nome||'', porte:ref.porte||'',
+        qtd:p.qtd||1, statusPlano:p.statusPlano||'Aguarda Aprovação', statusAuditoria:p.statusAuditoria||'Aguarda Auditoria',
+        motivoRecusa:p.motivoRecusa||'',
+        valorPrevisto:p.valorPrevisto||0, valorPago:p.valorPago||0, dataPagamento:p.dataPagamento||''
+      }));
+    });
+  }
+
+  cir({paciente:'João Ribeiro', convenioId:cMap['Amil'], hospitalId:hMap['Memorial Star'], dataSolicitacao:'2026-01-10', dataCirurgia:'2026-01-16', carater:'Eletiva', papel:'Cirurgião', opme:'Kit artroscopia de joelho — 2 parafusos de interferência bioabsorvíveis, fio de sutura de alta resistência.\nFabricante: Arthrex · NF 4471 · R$ 2.400,00', obs:'Artroscopia de joelho'},[
+    {codigo:'30733057', valorPrevisto:1800, statusPlano:'Aprovado', statusAuditoria:'Aprovado', valorPago:1800, dataPagamento:'2026-02-15'},
+    {codigo:'30726212', valorPrevisto:900, statusPlano:'Aprovado', statusAuditoria:'Aprovado', valorPago:720, dataPagamento:'2026-02-15'},
+  ]);
+  cir({paciente:'José Santos', convenioId:cMap['Sulamérica'], hospitalId:hMap['H. Maria Lucinda'], dataSolicitacao:'2026-03-02', dataCirurgia:'2026-03-08', carater:'Urgência', papel:'1º Auxiliar', opme:'Haste femoral bloqueada + 4 parafusos de bloqueio.\nFabricante: Synthes · NF 5120 · R$ 8.000,00 (1 parafuso glosado na auditoria)', obs:'Fratura de fêmur'},[
+    {codigo:'30725127', valorPrevisto:3200, statusPlano:'Aprovado', statusAuditoria:'Aprovado', valorPago:3200, dataPagamento:'2026-05-10'},
+    {codigo:'30724082', valorPrevisto:2400, statusPlano:'Aprovado', statusAuditoria:'Recusado', motivoRecusa:'Ausência de autorização prévia', valorPago:0, dataPagamento:'2026-05-10'},
+    {codigo:'30726212', valorPrevisto:1900, statusPlano:'Aguarda Aprovação', statusAuditoria:'Aguarda Auditoria'},
+  ]);
+  cir({paciente:'Maria Oliveira', convenioId:cMap['Bradesco Saúde'], hospitalId:hMap['Unimed I'], dataSolicitacao:'2026-05-20', dataCirurgia:'2026-05-27', carater:'Eletiva', papel:'Cirurgião', opme:'1 parafuso de interferência tibial + botão cortical femoral (endobutton).\nFabricante: Smith & Nephew · R$ 1.200,00', obs:'Reconstrução de LCA'},[
+    {codigo:'30733073', valorPrevisto:2600, statusPlano:'Aprovado', statusAuditoria:'Aprovado', valorPago:2600, dataPagamento:'2026-07-18'},
+  ]);
+  cir({paciente:'Antônio Carvalho', convenioId:cMap['Unimed'], hospitalId:hMap['Unimed II'], dataSolicitacao:'2026-06-25', dataCirurgia:'2026-07-01', carater:'Eletiva', papel:'Cirurgião', opme:'Prótese total de quadril não cimentada: componente acetabular, cabeça femoral cerâmica, haste femoral.\nFabricante: Zimmer Biomet · NF 6033 · R$ 5.400,00', obs:'Prótese total de quadril'},[
+    {codigo:'30724058', valorPrevisto:4800, statusPlano:'Aprovado', statusAuditoria:'Aguarda Auditoria'},
+    {codigo:'30725119', valorPrevisto:1500, statusPlano:'Aguarda Aprovação', statusAuditoria:'Aguarda Auditoria'},
+  ]);
+  cir({paciente:'Fernanda Lima', convenioId:cMap['Amil'], hospitalId:hMap['Memorial São José'], dataSolicitacao:'2026-07-15', dataCirurgia:'2026-07-22', carater:'Eletiva', papel:'2º Auxiliar', opme:'', obs:''},[
+    {codigo:'30733057', valorPrevisto:1600, statusPlano:'Aprovado', statusAuditoria:'Aguarda Auditoria'},
+  ]);
+  cir({paciente:'Paulo Mendes', convenioId:cMap['Geap'], hospitalId:hMap['HER'], dataSolicitacao:'2026-08-05', dataCirurgia:'2026-08-12', carater:'Urgência', papel:'Cirurgião', opme:'Placa bloqueada de fíbula distal + parafusos corticais e de bloqueio.\nR$ 2.100,00 · autorização de urgência', obs:'Fratura de tornozelo'},[
+    {codigo:'30728126', valorPrevisto:2800, statusPlano:'Aguarda Aprovação', statusAuditoria:'Aguarda Auditoria'},
+    {codigo:'30728096', valorPrevisto:1200, statusPlano:'Recusado', statusAuditoria:'Aguarda Auditoria'},
+  ]);
+  cir({paciente:'Cláudia Rocha', convenioId:cMap['Particular'], hospitalId:hMap['Max Day'], dataSolicitacao:'2026-08-18', dataCirurgia:'2026-08-24', carater:'Eletiva', papel:'Cirurgião', opme:'Sem OPME.', obs:'Cirurgia de mão'},[
+    {codigo:'30722489', valorPrevisto:3500, statusPlano:'Aprovado', statusAuditoria:'Aprovado', valorPago:3500, dataPagamento:'2026-08-25'},
+  ]);
+
+  return db;
+}
+
+/* ---------------- session ---------------- */
+let session = null;   // { medicoId, user?, email }
+if(!SB_ON){ try{ const s=localStorage.getItem(LS_SESSION); if(s) session=JSON.parse(s); }catch(e){} }
+
+function currentMed(){ return session ? DB.medicos.find(m=>m.id===session.medicoId) : null; }
+function setSession(medicoId){ session={medicoId}; if(!SB_ON) localStorage.setItem(LS_SESSION,JSON.stringify(session)); }
+/* garante um registro de médico local para o usuário autenticado */
+function ensureMedico(){
+  if(!session || currentMed()) return;
+  const u = session.user || {};
+  const md = (u.user_metadata||{});
+  DB.medicos.push({ id: session.medicoId, nome: md.nome || session.email || 'Médico', email: session.email || '', crm: md.crm||'', esp: md.esp||'' });
+  save();
+}
+async function logout(){
+  if(SB_ON && sb){ try{ await sb.auth.signOut(); }catch(e){} }
+  session=null; try{ localStorage.removeItem(LS_SESSION); }catch(e){}
+  state.view='cirurgias'; render();
+}
+
+/* ---------------- tenant-scoped selectors ---------------- */
+const M = () => session.medicoId;
+const myConvenios = () => DB.convenios.filter(c=>c.medicoId===M());
+const myHospitais = () => DB.hospitais.filter(h=>h.medicoId===M());
+const myCirurgias = () => DB.cirurgias.filter(c=>c.medicoId===M());
+const procsOf = cirId => DB.procedimentos.filter(p=>p.cirurgiaId===cirId);
+const myProcs = () => { const ids=new Set(myCirurgias().map(c=>c.id)); return DB.procedimentos.filter(p=>ids.has(p.cirurgiaId)); };
+const convName = id => (DB.convenios.find(c=>c.id===id)||{}).nome || '—';
+const hospName = id => (DB.hospitais.find(h=>h.id===id)||{}).nome || '—';
+const cirOf = id => DB.cirurgias.find(c=>c.id===id);
+
+/* ---------------- business rules ---------------- */
+function situacao(p){
+  const prev=+p.valorPrevisto||0, pago=+p.valorPago||0;
+  // recusa do plano = não foi aprovado antes da cirurgia; não entra em pagamentos/glosa
+  if(p.statusPlano==='Recusado') return 'Recusado pelo plano';
+  // recusa da auditoria sem pagamento = glosa integral
+  if(p.statusAuditoria==='Recusado' && !pago && !p.dataPagamento) return 'Glosado';
+  if(p.dataPagamento){
+    if(pago>=prev && prev>0) return 'Pago';
+    if(pago>0) return 'Glosa parcial';
+    return 'Glosado';
+  }
+  return 'A receber';
+}
+const SIT_BADGE = {
+  'Pago':'b-green','A receber':'b-amber','Glosa parcial':'b-red','Glosado':'b-red','Recusado pelo plano':'b-gray'
+};
+function saldoAberto(p){ // valor ainda esperado
+  if(situacao(p)!=='A receber') return 0;
+  return (+p.valorPrevisto||0) - (+p.valorPago||0);
+}
+function glosaDe(p){
+  const s=situacao(p);
+  if(s==='Glosa parcial'||s==='Glosado') return (+p.valorPrevisto||0)-(+p.valorPago||0);
+  return 0;
+}
+/* média histórica efetivamente paga — mesmo código + mesmo convênio + mesmo papel (estrito).
+   O papel importa: cirurgião, 1º/2º auxiliar e anestesista recebem valores distintos. */
+function mediaPagaHistorica(codigo, convenioId, papel, exceptId){
+  const code=String(codigo||'').replace(/\D/g,'');
+  if(!code || !convenioId) return null;
+  const vals=myProcs().filter(p=>{
+    if(p.id===exceptId) return false;
+    if(String(p.codigo).replace(/\D/g,'')!==code) return false;
+    if(!((+p.valorPago||0)>0)) return false;
+    const c=cirOf(p.cirurgiaId)||{};
+    if(c.convenioId!==convenioId) return false;
+    if(papel && (c.papel||'')!==papel) return false;
+    return true;
+  }).map(p=>+p.valorPago||0);
+  if(!vals.length) return null;
+  return { media: Math.round(vals.reduce((s,v)=>s+v,0)/vals.length*100)/100, n: vals.length };
+}
+
+const cirTotais = cirId => {
+  const ps=procsOf(cirId);
+  return {
+    previsto: ps.reduce((s,p)=>s+(+p.valorPrevisto||0),0),
+    pago: ps.reduce((s,p)=>s+(+p.valorPago||0),0),
+    aberto: ps.reduce((s,p)=>s+saldoAberto(p),0),
+    glosa: ps.reduce((s,p)=>s+glosaDe(p),0),
+    n: ps.length
+  };
+};
+
+const BUCKETS = ['0–30','31–60','61–90','91–120','+120'];
+function bucketOf(iso){
+  const d=daysSince(iso);
+  if(d<=30) return '0–30';
+  if(d<=60) return '31–60';
+  if(d<=90) return '61–90';
+  if(d<=120) return '91–120';
+  return '+120';
+}
+
+/* ============================================================
+   ROUTER
+   ============================================================ */
+const state = { view:'cirurgias', params:{}, filters:{} };
+function go(view,params={}){ state.view=view; state.params=params; render(); window.scrollTo(0,0); }
+
+const NAV = [
+  {group:'Operação', items:[
+    {id:'cirurgias', label:'Procedimentos', icon:iconCal},
+    {id:'pagamentos', label:'Pagamentos', icon:iconCheck},
+    {id:'recebiveis', label:'Recebíveis (aging)', icon:iconClock},
+    {id:'resumo', label:'Resumo', icon:iconChart},
+  ]},
+  {group:'Cadastros', items:[
+    {id:'convenios', label:'Convênios', icon:iconDoc},
+    {id:'hospitais', label:'Hospitais', icon:iconHosp},
+    {id:'referencia', label:'Valores de referência', icon:iconChart},
+    {id:'cbhpm', label:'Tabela CBHPM', icon:iconBook},
+  ]},
+  {group:'Sistema', items:[
+    {id:'config', label:'Backup e configurações', icon:iconGear},
+  ]},
+];
+
+function lgpdKey(){ return 'controldoctor.lgpd.' + (session&&session.medicoId||''); }
+function lgpdOk(){ try{ return localStorage.getItem(lgpdKey())==='1'; }catch(e){ return false; } }
+function setLgpdOk(){ try{ localStorage.setItem(lgpdKey(),'1'); }catch(e){} }
+
+function render(){
+  const app=$('#app');
+  if(!session){ app.innerHTML=loginView(); bindLogin(); return; }
+  ensureMedico();
+  const med=currentMed();
+  if(!med){ app.innerHTML=loginView(); bindLogin(); return; }
+  if(!lgpdOk()){ app.innerHTML=lgpdView(med); bindLgpd(); return; }
+  app.innerHTML = `
+    <div class="shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand"><div class="brand-mark">CD</div><div class="brand-name">Control<span>Doctor</span></div></div>
+        ${NAV.map(g=>`
+          <div class="nav-group">
+            <div class="nav-group-label">${g.group}</div>
+            ${g.items.map(it=>`<button class="nav-item ${state.view===it.id?'active':''}" data-nav="${it.id}">${it.icon()}<span>${it.label}</span></button>`).join('')}
+          </div>`).join('')}
+        <div class="sidebar-foot">Protótipo · 2M Consultoria<br>Dados salvos neste navegador<br><button class="link-btn" id="lgpdLink" style="color:#5eead4;font-size:11.5px;padding:0;margin-top:6px">Responsabilidade / LGPD</button></div>
+      </aside>
+      <div class="main">
+        <div class="topbar">
+          <button class="btn btn-ghost btn-sm" id="menuBtn" style="display:none">☰</button>
+          <div style="font-weight:650">${navTitle()}</div>
+          <div class="who">
+            <span>${esc(med.crm||'')}</span>
+            <div class="avatar" title="${esc(med.nome)}">${initials(med.nome)}</div>
+            <button class="btn btn-ghost btn-sm" id="logoutBtn">Sair</button>
+          </div>
+        </div>
+        <div class="content" id="viewRoot"></div>
+      </div>
+    </div>`;
+  $$('[data-nav]').forEach(b=>b.onclick=()=>go(b.dataset.nav));
+  $('#logoutBtn').onclick=logout;
+  if($('#lgpdLink')) $('#lgpdLink').onclick=()=>{ $('#app').innerHTML=lgpdView(med); bindLgpd(); $('#lg-ok').checked=true; $('#lg-go').disabled=false; };
+  const views={cirurgias:viewCirurgias,pagamentos:viewPagamentos,recebiveis:viewRecebiveis,resumo:viewResumo,convenios:viewConvenios,hospitais:viewHospitais,referencia:viewReferencia,cbhpm:viewCbhpm,config:viewConfig};
+  (views[state.view]||viewCirurgias)();
+}
+function navTitle(){ for(const g of NAV) for(const it of g.items) if(it.id===state.view) return it.label; return ''; }
+function initials(n){ return (n||'').replace(/^(Dr|Dra)\.?\s*/i,'').split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase(); }
+
+/* ============================================================
+   LOGIN
+   ============================================================ */
+let loginMode='login';
+function loginView(){
+  return `
+  <div class="login-wrap"><div class="login-card">
+    <div class="brand"><div class="brand-mark">CD</div><div class="brand-name">Control<span>Doctor</span></div></div>
+    <div class="login-sub">Controle de pagamentos de cirurgias</div>
+    <div id="loginForm">
+    ${loginMode==='login' ? `
+      <div class="field"><label>E-mail</label><input id="li-email" type="email" autocomplete="username" placeholder="voce@exemplo.com"></div>
+      <div class="field"><label>Senha</label><input id="li-senha" type="password" autocomplete="current-password" placeholder="••••••••"></div>
+      <div class="err" id="li-err"></div>
+      <button class="btn btn-primary" id="li-go">Entrar</button>
+      <div style="text-align:center;margin-top:14px;font-size:13px">
+        Não tem conta? <button class="link-btn" id="li-toReg">Criar conta</button>
+      </div>` : `
+      <div class="field"><label>Nome</label><input id="rg-nome" placeholder="Dr. Nome Sobrenome"></div>
+      <div class="field"><label>CRM</label><input id="rg-crm" placeholder="CRM-UF 00000"></div>
+      <div class="field"><label>Especialidade</label><input id="rg-esp" placeholder="Ortopedia..."></div>
+      <div class="field"><label>E-mail</label><input id="rg-email" type="email" autocomplete="username"></div>
+      <div class="field"><label>Senha</label><input id="rg-senha" type="password" autocomplete="new-password" placeholder="mínimo 6 caracteres"></div>
+      <div class="err" id="rg-err"></div>
+      <button class="btn btn-primary" id="rg-go">Criar conta</button>
+      <div style="text-align:center;margin-top:14px;font-size:13px">
+        Já tem conta? <button class="link-btn" id="rg-toLogin">Entrar</button>
+      </div>`}
+    </div>
+    ${SB_ON ? '' : '<div class="demo-box" style="color:var(--amber)">⚠ Modo local de testes (Supabase não configurado).<br>Conta de teste: <b>ricardo@controldoctor.app</b> / <b>123456</b></div>'}
+  </div></div>`;
+}
+function bindLogin(){
+  const busy=(sel,on)=>{ const b=$(sel); if(b){ b.disabled=on; b.textContent=on?'Aguarde…':b.dataset.lbl; } };
+  if(loginMode==='login'){
+    $('#li-toReg').onclick=()=>{loginMode='register';render();bindLogin();};
+    const go=$('#li-go'); go.dataset.lbl=go.textContent;
+    const doLogin=async()=>{
+      const email=$('#li-email').value.trim().toLowerCase(), senha=$('#li-senha').value;
+      if(!email||!senha){ $('#li-err').textContent='Informe e-mail e senha.'; return; }
+      if(!SB_ON){ // fallback local
+        const m=DB.medicos.find(x=>x.email&&x.email.toLowerCase()===email&&x.senha===senha);
+        if(!m){ $('#li-err').textContent='E-mail ou senha incorretos.'; return; }
+        setSession(m.id); state.view='cirurgias'; render(); return;
+      }
+      $('#li-err').textContent=''; busy('#li-go',true);
+      const { error } = await sb.auth.signInWithPassword({ email, password: senha });
+      busy('#li-go',false);
+      if(error){ $('#li-err').textContent = /Invalid login/.test(error.message)?'E-mail ou senha incorretos.':(/confirm/i.test(error.message)?'Confirme seu e-mail antes de entrar.':error.message); return; }
+      // onAuthStateChange cuida do render
+    };
+    $('#li-go').onclick=doLogin;
+    $('#li-senha').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+  } else {
+    $('#rg-toLogin').onclick=()=>{loginMode='login';render();bindLogin();};
+    const go=$('#rg-go'); go.dataset.lbl=go.textContent;
+    $('#rg-go').onclick=async()=>{
+      const nome=$('#rg-nome').value.trim(), email=$('#rg-email').value.trim().toLowerCase(), senha=$('#rg-senha').value;
+      const crm=$('#rg-crm').value.trim(), esp=$('#rg-esp').value.trim();
+      if(!nome||!email||!senha){ $('#rg-err').textContent='Preencha nome, e-mail e senha.'; return; }
+      if(senha.length<6){ $('#rg-err').textContent='A senha precisa ter ao menos 6 caracteres.'; return; }
+      if(!SB_ON){
+        if(DB.medicos.some(m=>m.email&&m.email.toLowerCase()===email)){ $('#rg-err').textContent='Já existe uma conta com este e-mail.'; return; }
+        const m={id:uid('med'),nome,email,senha,crm,esp}; DB.medicos.push(m); save();
+        setSession(m.id); state.view='cirurgias'; loginMode='login'; render(); return;
+      }
+      $('#rg-err').textContent=''; busy('#rg-go',true);
+      const { data, error } = await sb.auth.signUp({ email, password: senha, options:{ data:{ nome, crm, esp } } });
+      busy('#rg-go',false);
+      if(error){ $('#rg-err').textContent = /already/i.test(error.message)?'Já existe uma conta com este e-mail.':error.message; return; }
+      if(data.user && !data.session){ $('#rg-err').style.color='var(--green)'; $('#rg-err').textContent='Conta criada! Confirme o e-mail que enviamos e depois faça login.'; loginMode='login'; return; }
+      // com confirmação desativada, entra direto via onAuthStateChange
+    };
+  }
+}
+
+/* ============================================================
+   PÁGINA DE RESPONSABILIDADE (LGPD) — mostrada uma vez após o login
+   ============================================================ */
+function lgpdView(med){
+  return `
+  <div class="login-wrap"><div class="login-card" style="max-width:560px">
+    <div class="brand"><div class="brand-mark">CD</div><div class="brand-name">Control<span>Doctor</span></div></div>
+    <h3 style="margin:16px 0 4px;font-size:17px">Responsabilidade sobre os dados</h3>
+    <div class="login-sub" style="margin-bottom:16px">Olá, ${esc(med.nome)}. Leia antes de continuar.</div>
+
+    <div style="font-size:13px;line-height:1.55;color:var(--text)">
+      <p style="margin:0 0 12px">Você é o <b>responsável (controlador)</b> pelos dados dos seus pacientes registrados nesta ferramenta. Os dados ficam <b>apenas neste dispositivo/navegador</b> — não são enviados para nenhum servidor.</p>
+      <p style="margin:0 0 8px;font-weight:650">Ao usar o ControlDoctor, você se compromete a:</p>
+      <ul style="margin:0 0 12px;padding-left:20px">
+        <li style="margin:5px 0"><b>Nunca registrar nome completo, CPF, RG, telefone, e-mail ou endereço</b> do paciente. Use apenas iniciais ou um código.</li>
+        <li style="margin:5px 0">Não incluir, no campo <b>Cirurgia / Observações</b> ou em qualquer outro, informações que identifiquem o paciente.</li>
+        <li style="margin:5px 0">O número do prontuário sozinho não identifica o paciente. A ligação entre esse número e o nome real deve ficar <b>apenas no sistema da sua clínica</b> — nunca aqui.</li>
+        <li style="margin:5px 0">Não usar em <b>computador compartilhado</b>; encerrar a sessão ao terminar.</li>
+        <li style="margin:5px 0">Garantir uma <b>base legal</b> para o tratamento (tutela da saúde / execução de contrato) e informar o paciente quando aplicável.</li>
+      </ul>
+      <p style="margin:0;color:var(--muted);font-size:12px">O sistema já reduz nomes a iniciais automaticamente, mas isso não substitui o seu cuidado.</p>
+    </div>
+
+    <label style="display:flex;gap:9px;align-items:flex-start;margin:16px 0 12px;font-size:13px;font-weight:500">
+      <input type="checkbox" id="lg-ok" style="margin-top:2px"> Li e estou ciente das minhas responsabilidades como controlador dos dados.
+    </label>
+    <button class="btn btn-primary" id="lg-go" disabled>Entrar na ferramenta</button>
+    <div style="text-align:center;margin-top:12px"><button class="link-btn" id="lg-out">Sair</button></div>
+  </div></div>`;
+}
+function bindLgpd(){
+  const cb=$('#lg-ok'), go=$('#lg-go');
+  cb.onchange=()=>{ go.disabled=!cb.checked; };
+  go.onclick=()=>{ if(!cb.checked) return; setLgpdOk(); state.view='cirurgias'; render(); };
+  $('#lg-out').onclick=logout;
+}
+
+/* ============================================================
+   VIEW: CIRURGIAS
+   ============================================================ */
+const PAPEIS = ['Cirurgião','1º Auxiliar','2º Auxiliar','Anestesista'];
+const localOptions = () => [...new Set([...myHospitais().map(h=>h.nome), ...myConvenios().map(c=>c.nome)])].sort((a,b)=>a.localeCompare(b));
+
+function viewCirurgias(){
+  const root=$('#viewRoot');
+  const f = state.filters.cir = Object.assign({pac:'',local:'',cp:'',sit:'',de:'',ate:''}, state.filters.cir||{});
+  const all = myCirurgias().slice().sort((a,b)=>(b.dataCirurgia||'').localeCompare(a.dataCirurgia||''));
+  const pacientes = [...new Set([...all.map(c=>c.paciente), ...all.map(c=>c.prontuario)].filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b)));
+
+  const sel = new Set();   // seleção múltipla para exclusão em lote
+
+  const applyFilters = () => all.filter(c=>{
+    const ci = s => String(s||'').toLowerCase();
+    if(f.pac){ const q=ci(f.pac); if(!ci(c.paciente).includes(q) && !ci(c.prontuario).includes(q)) return false; }
+    if(f.local){ const q=ci(f.local); if(!ci(hospName(c.hospitalId)).includes(q) && !ci(convName(c.convenioId)).includes(q)) return false; }
+    if(f.cp){ const i=f.cp.indexOf(':'), dim=f.cp.slice(0,i), val=f.cp.slice(i+1);
+      if(dim==='car' && c.carater!==val) return false;
+      if(dim==='papel' && (c.papel||'')!==val) return false;
+    }
+    if(f.de && (c.dataCirurgia||'') < f.de) return false;
+    if(f.ate && (c.dataCirurgia||'') > f.ate) return false;
+    if(f.sit){
+      const sits=procsOf(c.id).map(situacao);
+      if(f.sit==='aberto' && !sits.includes('A receber')) return false;
+      if(f.sit==='pago' && !(sits.length && sits.every(x=>x==='Pago'))) return false;
+      if(f.sit==='glosa' && !sits.some(x=>x==='Glosa parcial'||x==='Glosado'||x==='Recusado pelo plano')) return false;
+    }
+    return true;
+  });
+
+  root.innerHTML = `
+    <div class="page-head">
+      <div><h1>Procedimentos</h1><p id="cirCount"></p></div>
+      <button class="btn btn-primary" style="width:auto" id="novaCir">+ Nova cirurgia</button>
+    </div>
+    <div class="toolbar">
+      <input class="search" id="fpac" list="dlPac" placeholder="Nº prontuário ou paciente..." value="${esc(f.pac)}">
+      <input class="search" id="flocal" list="dlLocal" placeholder="Hospital ou convênio..." value="${esc(f.local)}">
+      <select id="fcp">
+        <option value="">Caráter / papel: todos</option>
+        <optgroup label="Caráter">
+          <option value="car:Eletiva" ${f.cp==='car:Eletiva'?'selected':''}>Eletiva</option>
+          <option value="car:Urgência" ${f.cp==='car:Urgência'?'selected':''}>Urgência</option>
+        </optgroup>
+        <optgroup label="Papel do médico">
+          ${PAPEIS.map(p=>`<option value="papel:${esc(p)}" ${f.cp===('papel:'+p)?'selected':''}>${esc(p)}</option>`).join('')}
+        </optgroup>
+      </select>
+      <select id="fsit"><option value="">Situação: todas</option>
+        <option value="aberto" ${f.sit==='aberto'?'selected':''}>Com valor a receber</option>
+        <option value="pago" ${f.sit==='pago'?'selected':''}>Totalmente pago</option>
+        <option value="glosa" ${f.sit==='glosa'?'selected':''}>Com glosa/recusa</option>
+      </select>
+      <span class="flt-range">Cirurgia de <input type="date" id="fde" value="${f.de||''}"> até <input type="date" id="fate" value="${f.ate||''}"></span>
+      <button class="btn btn-sm btn-ghost" id="fclear">Limpar</button>
+    </div>
+    <datalist id="dlPac">${pacientes.map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist>
+    <datalist id="dlLocal">${localOptions().map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist>
+    <div id="cirListWrap"></div>`;
+
+  const paint = () => {
+    const rows = applyFilters();
+    [...sel].forEach(id=>{ if(!all.some(c=>c.id===id)) sel.delete(id); });
+    $('#cirCount').textContent = `${rows.length} cirurgia(s) · lançamento de procedimentos e acompanhamento de pagamento`;
+    const bar = sel.size ? `<div class="bulk-bar"><b>${sel.size}</b> registro(s) selecionado(s)
+      <button class="btn btn-sm btn-danger" id="bulkDel">Excluir selecionados</button>
+      <button class="btn btn-sm btn-ghost" id="bulkClear">Limpar seleção</button></div>` : '';
+    const allChecked = rows.length>0 && rows.every(c=>sel.has(c.id));
+    $('#cirListWrap').innerHTML = `${bar}
+      <div class="card"><div class="card-body flush"><div class="t-wrap">
+      ${rows.length? `<table class="tbl-compact"><thead><tr>
+        <th style="width:26px"><input type="checkbox" id="selAll" ${allChecked?'checked':''}></th>
+        <th>Data / cirurgia</th><th>Prontuário / paciente</th><th>Convênio / hospital</th><th>Caráter</th><th>Papel</th>
+        <th class="num">Proc.</th><th class="num">Previsto</th><th class="num">Recebido</th><th class="num">A receber</th><th style="width:24px"></th>
+      </tr></thead><tbody>
+        ${rows.map(c=>{const t=cirTotais(c.id);return `
+        <tr class="row-click${sel.has(c.id)?' row-sel':''}" data-cir="${c.id}">
+          <td onclick="event.stopPropagation()"><input type="checkbox" class="rowsel" data-id="${c.id}" ${sel.has(c.id)?'checked':''}></td>
+          <td><b>${fmtDate(c.dataCirurgia)}</b>${c.obs?`<div class="hint-txt">${esc(c.obs)}</div>`:''}</td>
+          <td><b style="font-variant-numeric:tabular-nums">${esc(c.prontuario||'—')}</b><div class="hint-txt">${esc(c.paciente||'')}</div></td>
+          <td>${esc(convName(c.convenioId))}<div class="hint-txt">${esc(hospName(c.hospitalId))}</div></td>
+          <td>${carBadge(c.carater)}</td>
+          <td>${esc(c.papel||'—')}</td>
+          <td class="num">${t.n}</td>
+          <td class="num">${money0(t.previsto)}</td>
+          <td class="num" style="color:var(--green)">${money0(t.pago)}</td>
+          <td class="num" style="color:${t.aberto>0?'var(--amber)':'var(--muted)'}">${money0(t.aberto)}</td>
+          <td class="num"><button class="chev" data-edit="${c.id}" title="Abrir">&rsaquo;</button></td>
+        </tr>`;}).join('')}
+      </tbody></table>` : emptyState('Nenhuma cirurgia encontrada', all.length?'Ajuste os filtros para ampliar a busca.':'Clique em “Nova cirurgia” para começar.')}
+      </div></div></div>`;
+    $$('#cirListWrap [data-edit]').forEach(b=>b.onclick=e=>{e.stopPropagation();openCirurgia(b.dataset.edit);});
+    $$('#cirListWrap [data-cir]').forEach(tr=>tr.onclick=()=>openCirurgia(tr.dataset.cir));
+    $$('#cirListWrap .rowsel').forEach(cb=>cb.onclick=e=>{ e.stopPropagation();
+      if(cb.checked) sel.add(cb.dataset.id); else sel.delete(cb.dataset.id); paint();
+    });
+    const selAll=$('#selAll');
+    if(selAll) selAll.onclick=e=>{ e.stopPropagation();
+      if(selAll.checked) rows.forEach(c=>sel.add(c.id)); else rows.forEach(c=>sel.delete(c.id)); paint();
+    };
+    if($('#bulkClear')) $('#bulkClear').onclick=()=>{ sel.clear(); paint(); };
+    if($('#bulkDel')) $('#bulkDel').onclick=()=>{
+      const n=sel.size;
+      if(!confirm(`Excluir ${n} registro(s) e todos os procedimentos/pagamentos vinculados? Esta ação não pode ser desfeita.`)) return;
+      const ids=[...sel];
+      DB.cirurgias = DB.cirurgias.filter(c=>!sel.has(c.id));
+      DB.procedimentos = DB.procedimentos.filter(p=>!ids.includes(p.cirurgiaId));
+      save(); sel.clear(); toast(`${n} registro(s) excluído(s)`); viewCirurgias();
+    };
+  };
+
+  $('#novaCir').onclick=()=>openCirurgia(null);
+  const upd=(id,key,ev='input')=>{ const el=$('#'+id); el.addEventListener(ev,()=>{ f[key]=el.value; paint(); }); };
+  upd('fpac','pac'); upd('flocal','local');
+  upd('fcp','cp','change'); upd('fsit','sit','change');
+  upd('fde','de','change'); upd('fate','ate','change');
+  $('#fclear').onclick=()=>{ Object.assign(f,{pac:'',local:'',cp:'',sit:'',de:'',ate:''}); viewCirurgias(); };
+  paint();
+}
+function carBadge(c){ return c==='Urgência'?`<span class="badge b-red">Urgência</span>`:`<span class="badge b-blue">Eletiva</span>`; }
+function emptyState(t,s){ return `<div class="empty">${iconCal()}<div style="font-weight:600;margin-top:8px">${t}</div><div>${s||''}</div></div>`; }
+
+/* ============================================================
+   MODAL: CIRURGIA (cadastro redesenhado)
+   ============================================================ */
+let draft=null;
+function openCirurgia(id){
+  const existing = id ? cirOf(id) : null;
+  draft = existing ? {
+    ...existing,
+    procs: procsOf(id).map(p=>({...p}))
+  } : {
+    id:null, paciente:'', prontuario:'', convenioId:'', hospitalId:'', dataSolicitacao:'', dataCirurgia:todayISO(),
+    carater:'Eletiva', papel:'Cirurgião', obs:'', procs:[ blankProc() ]
+  };
+  draft._tab = 1;
+  renderCirModal();
+}
+function blankProc(){ return {id:null, codigo:'', nome:'', porte:'', qtd:1, statusPlano:'Aguarda Aprovação', statusAuditoria:'Aguarda Auditoria', motivoRecusa:'', valorPrevisto:0, valorPago:0, dataPagamento:''}; }
+
+const MOTIVOS_RECUSA = [
+  'Ausência de autorização prévia',
+  'Procedimento não coberto pelo plano',
+  'Divergência de código / procedimento',
+  'Falta de documentação / laudo',
+  'Incompatibilidade CID × procedimento',
+  'Quantidade acima do autorizado',
+  'Procedimento em duplicidade',
+  'Prazo de solicitação / envio expirado',
+  'Carência não cumprida',
+  'Auditoria técnica — não pertinente',
+  'Pacote / diária já contempla o item',
+  'Outro',
+];
+
+const CIR_TABS = [
+  {n:1, label:'Dados da cirurgia'},
+  {n:2, label:'Procedimentos e status'},
+  {n:3, label:'Valores e pagamento'},
+];
+
+function renderCirModal(){
+  const isNew = !draft.id;
+  const tab = draft._tab = Math.max(1, Math.min(3, draft._tab||1));
+  const convs = myConvenios(), hosps = myHospitais();
+  const convOK = draft.convenioId ? (DB.convenios.find(c=>c.id===draft.convenioId)||{}).hospitalIds||[] : null;
+  const tPrev = draft.procs.reduce((s,p)=>s+(+p.valorPrevisto||0),0);
+  const tPago = draft.procs.reduce((s,p)=>s+(+p.valorPago||0),0);
+
+  const tab1 = ()=>`
+    <div class="form-grid">
+      <div class="full"><label>Identificação do paciente *</label><input id="d-pac" value="${esc(draft.paciente)}" placeholder="nome, código ou apelido">
+        <div class="hint-txt" id="d-pac-hint">Só as iniciais são gravadas (LGPD). Ex.: “Maria J. da Silva” → <b>M.J.S.</b></div>
+      </div>
+      <div class="full"><label>Nº prontuário</label><input id="d-pront" value="${esc(draft.prontuario||'')}" placeholder="número do prontuário no hospital"></div>
+      <div><label>Convênio *</label><select id="d-conv"><option value="">Selecione...</option>${convs.map(c=>`<option value="${c.id}" ${draft.convenioId===c.id?'selected':''}>${esc(c.nome)}</option>`).join('')}</select></div>
+      <div><label>Hospital *</label><select id="d-hosp"><option value="">Selecione...</option>${hosps.map(h=>`<option value="${h.id}" ${draft.hospitalId===h.id?'selected':''}>${esc(h.nome)}</option>`).join('')}</select>
+        ${convOK && draft.hospitalId && !convOK.includes(draft.hospitalId) ? `<div class="hint-txt" style="color:var(--amber)">⚠ Este convênio não está cadastrado para atender este hospital.</div>`:''}
+      </div>
+      <div><label>Data da solicitação</label><input id="d-dsol" type="date" value="${draft.dataSolicitacao||''}"></div>
+      <div><label>Data da cirurgia *</label><input id="d-dcir" type="date" value="${draft.dataCirurgia||''}"></div>
+      <div><label>Caráter</label><select id="d-car"><option ${draft.carater==='Eletiva'?'selected':''}>Eletiva</option><option ${draft.carater==='Urgência'?'selected':''}>Urgência</option></select></div>
+      <div><label>Papel do médico</label><select id="d-papel">${['Cirurgião','1º Auxiliar','2º Auxiliar','Anestesista'].map(x=>`<option ${draft.papel===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="full"><label>Cirurgia / Observações</label><input id="d-obs" value="${esc(draft.obs||'')}" placeholder="ex.: Artroscopia de joelho direito — reconstrução de LCA"></div>
+    </div>`;
+
+  const tab2 = ()=>`
+    <div class="hint-txt" style="margin-bottom:8px">Um procedimento CBHPM por linha. Os valores e pagamentos ficam na guia “Valores e pagamento”.</div>
+    <div class="t-wrap"><table class="proc-table"><thead><tr>
+      <th style="width:260px">Código / procedimento</th><th style="width:48px">Porte</th><th style="width:48px">Qtd</th>
+      <th style="width:140px">Status plano</th><th style="width:140px">Status auditoria</th><th style="width:200px">Motivo da recusa</th><th style="width:34px"></th>
+    </tr></thead><tbody id="procRows">
+      ${draft.procs.map((p,i)=>procRowHtml(p,i)).join('')}
+    </tbody></table></div>
+    <button class="btn btn-sm" id="addProc" style="margin-top:10px">+ Adicionar procedimento</button>`;
+
+  const tab3 = ()=>{
+    const real = draft.procs.filter(p=>p.codigo);
+    if(!real.length) return `<div class="empty">${iconCheck()}<div style="font-weight:600;margin-top:8px">Nenhum procedimento ainda</div><div>Adicione procedimentos na guia “Procedimentos e status”.</div></div>`;
+    return `<div class="t-wrap"><table class="proc-table"><thead><tr>
+      <th>Procedimento</th><th style="width:150px" class="num">Valor previsto</th><th style="width:120px" class="num">Valor pago</th><th style="width:150px">Data do pagamento</th>
+    </tr></thead><tbody id="valRows">
+      ${draft.procs.map((p,i)=>{ if(!p.codigo) return '';
+        const mh=mediaPagaHistorica(p.codigo, draft.convenioId, draft.papel, p.id);
+        const msg = mh
+          ? `Sugestão pela média histórica: ${mh.n} pagamento(s) deste código neste convênio, média ${money(mh.media)}.${p._autoPrev?'':' Valor editado manualmente.'}`
+          : 'Sem histórico deste código neste convênio — informe o valor manualmente.';
+        return `<tr data-pi="${i}">
+        <td style="vertical-align:middle"><span style="font-variant-numeric:tabular-nums;color:var(--muted)">${esc(fmtCbhpm(p.codigo))}</span><br>${esc(p.nome||'')}</td>
+        <td style="vertical-align:middle"><div style="display:flex;align-items:center;gap:6px">
+          <input data-f="valorPrevisto" type="number" step="0.01" class="num" value="${p.valorPrevisto||0}" style="flex:1;min-width:0">
+          <button type="button" class="info-dot${mh?' on':''}" data-info="${esc(msg)}" title="Origem do valor previsto">i</button>
+        </div></td>
+        <td style="vertical-align:middle"><input data-f="valorPago" type="number" step="0.01" class="num" value="${p.valorPago||0}"></td>
+        <td style="vertical-align:middle"><input data-f="dataPagamento" type="date" value="${p.dataPagamento||''}"></td>
+      </tr>`; }).join('')}
+    </tbody>
+    <tfoot><tr>
+      <td style="text-align:right;font-weight:650">Totais</td>
+      <td class="num" id="tfPrev" style="font-weight:700">${money(tPrev)}</td>
+      <td class="num" id="tfPago" style="font-weight:700;color:var(--green)">${money(tPago)}</td>
+      <td></td>
+    </tr></tfoot></table></div>
+    <div class="hint-txt" style="margin-top:8px">Clique no <span class="info-dot on" style="cursor:default;display:inline-block;vertical-align:middle">i</span> ao lado do valor previsto para ver a origem da sugestão.</div>`;
+  };
+
+  const body = tab===1?tab1():tab===2?tab2():tab3();
+
+  $('#modal-root').innerHTML = `
+  <div class="overlay" id="ov">
+    <div class="modal lg">
+      <div class="modal-head">
+        <h3>${isNew?'Nova cirurgia':'Cirurgia — '+esc(draft.paciente||'')}</h3>
+        <button class="x-btn" id="mx">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="tabs">
+          ${CIR_TABS.map(t=>`<button class="tab-btn ${tab===t.n?'active':''}" data-tab="${t.n}"><span class="tnum">${t.n}</span>${t.label}</button>`).join('')}
+        </div>
+        <div id="tabBody">${body}</div>
+      </div>
+      <div class="modal-foot">
+        ${!isNew?`<button class="btn btn-danger" id="delCir" style="margin-right:auto">Excluir cirurgia</button>`:''}
+        ${tab>1?`<button class="btn" id="prevTab">← Anterior</button>`:''}
+        ${tab<3?`<button class="btn" id="nextTab">Próxima →</button>`:''}
+        <button class="btn" id="mcancel">Cancelar</button>
+        <button class="btn btn-primary" style="width:auto" id="msave">Salvar</button>
+      </div>
+    </div>
+  </div>`;
+
+  const close=()=>{ $('#modal-root').innerHTML=''; };
+  $('#ov').onclick=e=>{ if(e.target.id==='ov') close(); };
+  $('#mx').onclick=close; $('#mcancel').onclick=close;
+
+  const goTab=n=>{ syncCirDraft(); draft._tab=n; renderCirModal(); };
+  $$('[data-tab]').forEach(b=>b.onclick=()=>goTab(+b.dataset.tab));
+  if($('#prevTab')) $('#prevTab').onclick=()=>goTab(tab-1);
+  if($('#nextTab')) $('#nextTab').onclick=()=>goTab(tab+1);
+  if($('#ocrBtn')) $('#ocrBtn').onclick=openOcrImport;   // OCR oculto nesta versão
+  $('#msave').onclick=saveCirurgia;
+  if($('#delCir')) $('#delCir').onclick=()=>{
+    if(!confirm('Excluir esta cirurgia e seus procedimentos?')) return;
+    DB.cirurgias=DB.cirurgias.filter(c=>c.id!==draft.id);
+    DB.procedimentos=DB.procedimentos.filter(p=>p.cirurgiaId!==draft.id);
+    save(); close(); toast('Cirurgia excluída'); render();
+  };
+
+  if(tab===1){
+    const bind=(sel,key)=>{ const el=$(sel); if(!el) return; el.onchange=()=>{ draft[key]=el.value;
+      if(el.id==='d-conv' || el.id==='d-papel') aplicarMediaHistorica();
+      if(['d-conv','d-hosp','d-papel'].includes(el.id)) renderCirModal();
+    }; };
+    bind('#d-conv','convenioId'); bind('#d-hosp','hospitalId');
+    bind('#d-dsol','dataSolicitacao'); bind('#d-dcir','dataCirurgia'); bind('#d-car','carater'); bind('#d-papel','papel');
+    $('#d-pac').oninput=e=>{ draft.paciente=e.target.value;
+      const a=acronimoNome(e.target.value), h=$('#d-pac-hint');
+      if(h) h.innerHTML = (a && a!==e.target.value.trim())
+        ? `Será gravado como <b>${esc(a)}</b>`
+        : 'Só as iniciais são gravadas (LGPD). Ex.: “Maria J. da Silva” → <b>M.J.S.</b>';
+    };
+    $('#d-obs').oninput=e=>draft.obs=e.target.value;
+    $('#d-pront').oninput=e=>draft.prontuario=e.target.value;
+  } else if(tab===2){
+    $('#addProc').onclick=()=>{ syncCirDraft(); draft.procs.push(blankProc()); renderCirModal(); };
+    bindProcRows();
+  } else if(tab===3){
+    $$('#valRows [data-f]').forEach(el=>{ el.onchange=()=>{
+      if(el.dataset.f==='valorPrevisto'){ const tr=el.closest('tr'); const p=draft.procs[+tr.dataset.pi]; if(p) p._autoPrev=false; }
+      syncCirDraft(); updateValTotals();
+    }; });
+    $$('#valRows .info-dot').forEach(b=>b.onclick=()=>toast(b.dataset.info));
+  }
+}
+
+/* preenche valorPrevisto pela média histórica paga, para procs sem valor manual */
+function aplicarMediaHistorica(){
+  draft.procs.forEach(p=>{
+    if(!p.codigo) return;
+    if((+p.valorPrevisto||0)>0 && !p._autoPrev) return; // valor manual — não mexe
+    const mh=mediaPagaHistorica(p.codigo, draft.convenioId, draft.papel, p.id);
+    if(mh){ p.valorPrevisto=mh.media; p._autoPrev=true; }
+    else if(p._autoPrev){ p.valorPrevisto=0; p._autoPrev=false; }
+  });
+}
+
+/* captura o que está visível na guia atual para dentro de draft */
+function syncCirDraft(){
+  const v = id => { const el=$('#'+id); return el?el.value:undefined; };
+  const s = (k,val) => { if(val!==undefined) draft[k]=val; };
+  s('paciente',v('d-pac')); s('prontuario',v('d-pront')); s('convenioId',v('d-conv')); s('hospitalId',v('d-hosp'));
+  s('dataSolicitacao',v('d-dsol')); s('dataCirurgia',v('d-dcir')); s('carater',v('d-car'));
+  s('papel',v('d-papel')); s('obs',v('d-obs'));
+  $$('#procRows tr, #valRows tr').forEach(tr=>{
+    const i=+tr.dataset.pi; const p=draft.procs[i]; if(!p) return;
+    tr.querySelectorAll('[data-f]').forEach(el=>{
+      const f=el.dataset.f;
+      if(f==='codigo') return;
+      if(['qtd','valorPrevisto','valorPago'].includes(f)) p[f]=+el.value||0;
+      else p[f]=el.value;
+    });
+  });
+}
+const syncProcInputs = syncCirDraft; // compat
+
+function procRowHtml(p,i){
+  return `<tr data-pi="${i}">
+    <td class="cbhpm-cell">
+      <input class="cb-input" data-f="codigo" placeholder="código ou nome..." value="${esc(p.codigo? fmtCbhpm(p.codigo)+' — '+p.nome : '')}" autocomplete="off">
+      <div class="cbhpm-drop" style="display:none"></div>
+    </td>
+    <td style="text-align:center">${esc(p.porte||'—')}</td>
+    <td><input data-f="qtd" type="number" min="1" value="${p.qtd||1}"></td>
+    <td><select data-f="statusPlano">${['Aguarda Aprovação','Aprovado','Recusado'].map(x=>`<option ${p.statusPlano===x?'selected':''}>${x}</option>`).join('')}</select></td>
+    <td><select data-f="statusAuditoria" data-rerender="1">${['Aguarda Auditoria','Aprovado','Recusado','—'].map(x=>`<option ${p.statusAuditoria===x?'selected':''}>${x}</option>`).join('')}</select></td>
+    <td>${p.statusAuditoria==='Recusado'
+      ? `<select data-f="motivoRecusa"><option value="">Selecione o motivo...</option>${MOTIVOS_RECUSA.map(m=>`<option ${p.motivoRecusa===m?'selected':''}>${esc(m)}</option>`).join('')}</select>`
+      : `<span style="color:var(--border)">—</span>`}</td>
+    <td><button class="x-btn" data-del="${i}" title="Remover">&times;</button></td>
+  </tr>`;
+}
+
+function bindProcRows(){
+  $$('#procRows tr').forEach(tr=>{
+    const i=+tr.dataset.pi;
+    tr.querySelectorAll('[data-f]:not(.cb-input)').forEach(el=>{
+      el.onchange=()=>{ syncCirDraft(); if(el.dataset.rerender) renderCirModal(); };
+    });
+    tr.querySelector('[data-del]').onclick=()=>{
+      syncCirDraft();
+      const p=draft.procs[i]||{};
+      const preenchido = p.codigo || (+p.valorPrevisto||0) || (+p.valorPago||0);
+      if(preenchido && !confirm(`Remover o procedimento ${p.codigo?fmtCbhpm(p.codigo):''} desta cirurgia?`)) return;
+      draft.procs.splice(i,1); if(!draft.procs.length)draft.procs.push(blankProc()); renderCirModal();
+    };
+    const inp=tr.querySelector('.cb-input');
+    const drop=tr.querySelector('.cbhpm-drop');
+    let hi=-1, matches=[];
+    const showMatches=()=>{
+      const raw=inp.value;
+      matches=cbhpmSearch(raw);
+      if(!matches.length){ drop.style.display='none'; return; }
+      drop.innerHTML=matches.map((m,k)=>`<div class="cbhpm-opt ${k===hi?'hi':''}" data-k="${k}"><span class="code">${fmtCbhpm(m.codigo)}</span> — ${esc(m.nome)} <span style="color:var(--muted)">(${m.porte})</span></div>`).join('');
+      drop.style.display='block';
+      drop.querySelectorAll('.cbhpm-opt').forEach(o=>o.onmousedown=e=>{ e.preventDefault(); pick(+o.dataset.k); });
+    };
+    const pick=k=>{
+      const m=matches[k]; if(!m) return;
+      const p=draft.procs[i];
+      p.codigo=m.codigo; p.nome=m.nome; p.porte=m.porte;
+      // valor previsto: média histórica paga (código + convênio), se ainda não houver valor manual
+      const mh=mediaPagaHistorica(p.codigo, draft.convenioId, draft.papel, p.id);
+      if(mh && ((+p.valorPrevisto||0)===0 || p._autoPrev)){ p.valorPrevisto=mh.media; p._autoPrev=true; }
+      inp.value=fmtCbhpm(m.codigo)+' — '+m.nome;
+      drop.style.display='none';
+      renderCirModal();
+    };
+    inp.oninput=()=>{ hi=-1; showMatches(); };
+    inp.onfocus=()=>{ if(inp.value) showMatches(); };
+    inp.onblur=()=>{ setTimeout(()=>drop.style.display='none',150);
+      if(!inp.value.trim()){ draft.procs[i].codigo='';draft.procs[i].nome='';draft.procs[i].porte=''; } };
+    inp.onkeydown=e=>{
+      if(drop.style.display==='none') return;
+      if(e.key==='ArrowDown'){ hi=Math.min(hi+1,matches.length-1); showMatches(); e.preventDefault(); }
+      else if(e.key==='ArrowUp'){ hi=Math.max(hi-1,0); showMatches(); e.preventDefault(); }
+      else if(e.key==='Enter'){ if(hi>=0){ pick(hi); e.preventDefault(); } }
+      else if(e.key==='Escape'){ drop.style.display='none'; }
+    };
+  });
+}
+function updateValTotals(){
+  const tPrev=draft.procs.reduce((s,p)=>s+(+p.valorPrevisto||0),0);
+  const tPago=draft.procs.reduce((s,p)=>s+(+p.valorPago||0),0);
+  if($('#tfPrev')) $('#tfPrev').textContent=money(tPrev);
+  if($('#tfPago')) $('#tfPago').textContent=money(tPago);
+}
+
+/* ============================================================
+   OCR — importação de foto/PDF (MOCK — só estrutura por enquanto)
+   Estrutura única esperada de um resultado de OCR; quando houver
+   engine real, basta produzir este objeto e chamar aplicarOcr().
+   ============================================================ */
+function ocrEmpty(){
+  return {
+    paciente:'', prontuario:'', convenio:'', hospital:'', dataSolicitacao:'', dataCirurgia:'',
+    carater:'', papel:'', obs:'',
+    procedimentos:[],                 // {codigo,nome,qtd,statusPlano,statusAuditoria,valorPrevisto,valorPago,dataPagamento}
+    _fonte:{ arquivos:[], geradoEm:'', engine:'' }
+  };
+}
+/* Extrações reais dos documentos de exemplo (pré-lidos), casadas pelo nome do arquivo.
+   Serve para testar o fluxo ponta-a-ponta com dados verdadeiros dos PDFs/fotos.
+   Um leitor real (API de visão) produziria este mesmo objeto. */
+const OCR_AMOSTRAS = [
+  { re:/solicita[çc][ãa]o\s*0*1/i, dados:{
+      paciente:'MARIA JOSE DA SILVA CHAGAS', convenio:'SASSEPE', hospital:'Santa Teresinha',
+      dataCirurgia:'2026-07-15', carater:'Eletiva', papel:'Cirurgião',
+      obs:'Hallux valgo direito. Cirurgião: Dr. Carlos Henrique Magalhães · 1º aux.: Dra. Angelo Amorim · Anestesista: Dra. Marcella Melo (bloqueio + sedação). OPME: 2 parafusos chanfrados, fios guia, lâmina beaver, fresas.',
+      procedimentos:[{codigo:'30729181',qtd:1},{codigo:'30729203',qtd:1},{codigo:'30731208',qtd:1}] } },
+  { re:/solicita[çc][ãa]o\s*0*2/i, dados:{
+      paciente:'', convenio:'', hospital:'',
+      dataCirurgia:'', carater:'Urgência', papel:'Cirurgião',
+      obs:'Retirada de material de síntese em hálux direito. Início 22:00 / término 22:30. Cirurgião: Carlos Henrique Magalhães (CRM 22491) · Anestesista: Dra. Marcella Falcão (CRM 22478). OPME: 2 parafusos canulados 3.0 + fio guia.',
+      procedimentos:[{codigo:'30710022',qtd:1},{codigo:'30729246',qtd:1},{codigo:'31403239',qtd:1}] } },
+  { re:/solicita[çc][ãa]o\s*0*3/i, dados:{
+      paciente:'Diana Teresa de Barros Cavalcanti', prontuario:'000494222', convenio:'Geap', hospital:'São Marcos',
+      dataCirurgia:'2025-09-03', carater:'Eletiva', papel:'Cirurgião',
+      obs:'Hallux valgo direito. Cirurgião: Carlos Henrique Magalhães de Carvalho (CRM 22491-PE) · 1º aux.: Angelo Henrique Cavalcanti Amorim (23750-PE) · 2º aux.: Marcos Henriques Lyra Filho (24965-PE). Sangramento estimado 100 ml. OPME: lâmina/fresas percutâneas, 4 parafusos canulados chanfrados, fios guia.',
+      procedimentos:[{codigo:'30729181',qtd:2},{codigo:'30729203',qtd:10},{codigo:'30729106',qtd:8},{codigo:'40811026',qtd:1},{codigo:'30731208',qtd:18}] } },
+  { re:/solicita[çc][ãa]o\s*0*4/i, dados:{
+      paciente:'Diana Teresa de Barros Cavalcanti', prontuario:'000494222', convenio:'Geap', hospital:'São Marcos',
+      dataCirurgia:'2025-09-03', carater:'', papel:'Cirurgião',
+      obs:'(Página 2 da descrição cirúrgica) Acessos em 2º–5º metatarsos, tenotomias e osteotomias tipo DMMO. Previsão de alta em até 12h. OPME: lâmina/fresas percutâneas, 4 parafusos canulados chanfrados, fios guia.',
+      procedimentos:[] } },
+  { re:/solicita[çc][ãa]o\s*0*5/i, dados:{
+      paciente:'MANOEL DANIEL DE ASSIS JUNIOR', prontuario:'1184201', convenio:'IRH', hospital:'Guararapes',
+      dataCirurgia:'2023-07-15', carater:'', papel:'Cirurgião',
+      obs:'Fratura/luxação de tornozelo esq. + fratura de 1 metatarso esq. CID S82.7. Fixador externo tubo-tubo transarticular; 02 pinos em tíbia, 01 calcâneo, 01 cuneiforme medial; fio K em 1 metatarso. Cirurgião: Carlos Henrique Magalhães de Carvalho · Anestesista: Marcella de Melo Falcão (CRM 22478).',
+      procedimentos:[] } },
+];
+function ocrExtractMock(files){
+  const r = ocrEmpty();
+  r._fonte.arquivos = [...files].map(f=>f.name);
+  r._fonte.geradoEm = new Date().toISOString();
+  const nomes = r._fonte.arquivos.join(' ');
+  const hit = OCR_AMOSTRAS.find(s=>s.re.test(nomes));
+  if(hit){
+    r._fonte.engine = 'amostra';
+    Object.assign(r, JSON.parse(JSON.stringify(hit.dados)));
+    r.paciente = acronimoNome(r.paciente);   // minimização já na leitura
+    r.procedimentos = (r.procedimentos||[]).map(p=>({codigo:p.codigo,nome:'',qtd:p.qtd||1,statusPlano:'Aguarda Aprovação',statusAuditoria:'Aguarda Auditoria',valorPrevisto:0,valorPago:0,dataPagamento:''}));
+    if(!r.procedimentos.length) r.procedimentos=[{codigo:'',nome:'',qtd:1,statusPlano:'Aguarda Aprovação',statusAuditoria:'Aguarda Auditoria',valorPrevisto:0,valorPago:0,dataPagamento:''}];
+    return r;
+  }
+  // sem amostra correspondente → estrutura vazia (leitor real ainda não plugado)
+  r._fonte.engine = 'mock';
+  r.dataCirurgia = todayISO();
+  r.carater = 'Eletiva';
+  r.papel = 'Cirurgião';
+  r.procedimentos = [{codigo:'', nome:'', qtd:1, statusPlano:'Aguarda Aprovação', statusAuditoria:'Aguarda Auditoria', valorPrevisto:0, valorPago:0, dataPagamento:''}];
+  return r;
+}
+function openOcrImport(){
+  syncCirDraft();
+  $('#modal-root').insertAdjacentHTML('beforeend', `
+  <div class="overlay" id="ocrOv" style="z-index:140">
+    <div class="modal">
+      <div class="modal-head"><h3>Importar via OCR — foto ou PDF</h3><button class="x-btn" id="ocrX">&times;</button></div>
+      <div class="modal-body">
+        <p class="hint-txt" style="margin-top:0">Selecione a foto ou PDF da descrição cirúrgica / guia de autorização. Os campos extraídos aparecem abaixo para conferir e editar antes de aplicar. <b>Teste:</b> use os arquivos da pasta “Solicitações” (Sample Solicitação 1–5).</p>
+        <input type="file" id="ocrFile" accept="image/*,application/pdf" multiple capture="environment">
+        <div id="ocrReview" style="margin-top:14px"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" id="ocrCancel">Fechar</button>
+        <button class="btn btn-primary" style="width:auto;display:none" id="ocrApply">Aplicar ao cadastro</button>
+      </div>
+    </div>
+  </div>`);
+  const ov=$('#ocrOv'); const close=()=>ov.remove();
+  $('#ocrX').onclick=close; $('#ocrCancel').onclick=close;
+  ov.onclick=e=>{ if(e.target.id==='ocrOv') close(); };
+  let result=null;
+  const wireReview=()=>{
+    const add=$('#o-add');
+    if(add) add.onclick=()=>{ ocrCollectReview(result); result.procedimentos.push({codigo:'',qtd:1,valorPrevisto:0,valorPago:0,dataPagamento:''}); $('#ocrReview').innerHTML=ocrReviewHtml(result); wireReview(); };
+    $$('#o-procs [data-orm]').forEach(b=>b.onclick=()=>{ ocrCollectReview(result); result.procedimentos.splice(+b.dataset.orm,1); if(!result.procedimentos.length) result.procedimentos.push({codigo:'',qtd:1,valorPrevisto:0,valorPago:0,dataPagamento:''}); $('#ocrReview').innerHTML=ocrReviewHtml(result); wireReview(); });
+  };
+  $('#ocrFile').onchange=e=>{
+    const files=[...e.target.files]; if(!files.length) return;
+    result=ocrExtractMock(files);
+    $('#ocrReview').innerHTML=ocrReviewHtml(result);
+    $('#ocrApply').style.display='';
+    wireReview();
+  };
+  $('#ocrApply').onclick=()=>{
+    if(!result) return;
+    ocrCollectReview(result);
+    aplicarOcr(result);
+    close(); renderCirModal();
+    toast('Dados do OCR aplicados — confira cada guia');
+  };
+}
+function ocrReviewHtml(r){
+  const amostra = r._fonte && r._fonte.engine==='amostra';
+  return `
+  <div class="hint-txt" style="background:${amostra?'var(--blue-soft);color:var(--blue)':'var(--amber-soft);color:var(--amber)'};border-radius:8px;padding:9px 11px;margin-bottom:12px">
+    ${amostra
+      ? '📄 Dados extraídos do documento de exemplo. Confira/edite e clique em “Aplicar ao cadastro”.'
+      : '⚠ Sem leitor de OCR plugado para este arquivo: os campos abaixo <b>não</b> foram lidos. Preencha manualmente ou use um dos documentos de exemplo.'}
+  </div>
+  <div class="form-grid">
+    <div><label>Identificação do paciente</label><input id="o-pac" value="${esc(r.paciente)}"><div class="hint-txt">gravado só com iniciais</div></div>
+    <div><label>Nº prontuário</label><input id="o-pront" value="${esc(r.prontuario||'')}"></div>
+    <div><label>Convênio (nome)</label><input id="o-conv" value="${esc(r.convenio)}" placeholder="ex.: Amil"></div>
+    <div><label>Hospital (nome)</label><input id="o-hosp" value="${esc(r.hospital)}" placeholder="ex.: Memorial Star"></div>
+    <div><label>Data da solicitação</label><input id="o-dsol" type="date" value="${r.dataSolicitacao||''}"></div>
+    <div><label>Data da cirurgia</label><input id="o-dcir" type="date" value="${r.dataCirurgia||''}"></div>
+    <div><label>Caráter</label><select id="o-car"><option value=""></option><option ${r.carater==='Eletiva'?'selected':''}>Eletiva</option><option ${r.carater==='Urgência'?'selected':''}>Urgência</option></select></div>
+  </div>
+  <h4 style="margin:14px 0 6px;font-size:13px">Procedimentos detectados</h4>
+  <div class="t-wrap"><table class="proc-table"><thead><tr>
+    <th style="width:140px">Código CBHPM</th><th style="width:50px">Qtd</th><th class="num">Previsto</th><th class="num">Pago</th><th style="width:140px">Data pgto</th><th style="width:32px"></th>
+  </tr></thead><tbody id="o-procs">
+    ${r.procedimentos.map((p,i)=>ocrProcRow(p,i)).join('')}
+  </tbody></table></div>
+  <button class="btn btn-sm" id="o-add" type="button" style="margin-top:8px">+ Linha</button>
+  <label style="margin-top:12px;display:flex;gap:8px;align-items:center;font-weight:500"><input type="checkbox" id="o-merge" checked> Somar aos procedimentos já lançados (desmarque para substituir)</label>`;
+}
+function ocrProcRow(p,i){
+  return `<tr data-oi="${i}">
+    <td><input data-of="codigo" value="${esc(p.codigo||'')}" placeholder="ex.: 30733057"></td>
+    <td><input data-of="qtd" type="number" min="1" value="${p.qtd||1}"></td>
+    <td><input data-of="valorPrevisto" type="number" step="0.01" class="num" value="${p.valorPrevisto||0}"></td>
+    <td><input data-of="valorPago" type="number" step="0.01" class="num" value="${p.valorPago||0}"></td>
+    <td><input data-of="dataPagamento" type="date" value="${p.dataPagamento||''}"></td>
+    <td><button class="x-btn" data-orm="${i}" type="button" title="Remover">&times;</button></td>
+  </tr>`;
+}
+function ocrCollectReview(r){
+  const g = id => { const el=$('#'+id); return el?el.value:''; };
+  r.paciente=acronimoNome(g('o-pac')); r.prontuario=g('o-pront'); r.convenio=g('o-conv'); r.hospital=g('o-hosp');
+  r.dataSolicitacao=g('o-dsol'); r.dataCirurgia=g('o-dcir'); r.carater=g('o-car');
+  r.procedimentos = $$('#o-procs tr').map(tr=>{
+    const f = n => { const el=tr.querySelector(`[data-of="${n}"]`); return el?el.value:''; };
+    return { codigo:f('codigo'), nome:'', qtd:+f('qtd')||1,
+      statusPlano:'Aguarda Aprovação', statusAuditoria:'Aguarda Auditoria',
+      valorPrevisto:+f('valorPrevisto')||0, valorPago:+f('valorPago')||0, dataPagamento:f('dataPagamento') };
+  }).filter(p=>String(p.codigo).replace(/\D/g,''));
+  r._merge = $('#o-merge') ? $('#o-merge').checked : true;
+}
+function aplicarOcr(r){
+  const d=draft;
+  const set = (k,val) => { if(val!=null && String(val).trim()!=='') d[k]=val; };
+  set('paciente', r.paciente); set('prontuario', r.prontuario); set('dataSolicitacao', r.dataSolicitacao); set('dataCirurgia', r.dataCirurgia);
+  set('carater', r.carater); set('papel', r.papel); set('obs', r.obs);
+  if(r.convenio && r.convenio.trim()){
+    const nm=r.convenio.trim();
+    let cv=myConvenios().find(c=>c.nome.toLowerCase()===nm.toLowerCase());
+    if(!cv){ cv={id:uid('con'),medicoId:M(),nome:nm,hospitalIds:[]}; DB.convenios.push(cv); save(); }
+    d.convenioId=cv.id;
+  }
+  if(r.hospital && r.hospital.trim()){
+    const nm=r.hospital.trim();
+    let h=myHospitais().find(x=>x.nome.toLowerCase()===nm.toLowerCase());
+    if(!h){ h={id:uid('hos'),medicoId:M(),nome:nm,rede:''}; DB.hospitais.push(h); save(); }
+    d.hospitalId=h.id;
+    if(d.convenioId){ const cv=DB.convenios.find(c=>c.id===d.convenioId); if(cv && !(cv.hospitalIds||[]).includes(h.id)){ cv.hospitalIds=[...(cv.hospitalIds||[]),h.id]; save(); } }
+  }
+  const rows = (r.procedimentos||[]).map(p=>{
+    const code = String(p.codigo||'').replace(/\D/g,'');
+    const ref = CBHPM_BY_CODE[code] || {};
+    return { id:null, codigo:ref.codigo||code||'', nome:ref.nome||p.nome||'', porte:ref.porte||'',
+      qtd:+p.qtd||1, statusPlano:p.statusPlano||'Aguarda Aprovação', statusAuditoria:p.statusAuditoria||'Aguarda Auditoria',
+      valorPrevisto:+p.valorPrevisto||0, valorPago:+p.valorPago||0, dataPagamento:p.dataPagamento||'' };
+  }).filter(p=>p.codigo);
+  if(rows.length){
+    const existing = d.procs.filter(p=>p.codigo);
+    d.procs = r._merge ? existing.concat(rows) : rows;
+  }
+  if(!d.procs.length) d.procs=[blankProc()];
+  d._ocr = { arquivos:r._fonte.arquivos, geradoEm:r._fonte.geradoEm, engine:r._fonte.engine };
+}
+
+/* ============================================================
+   CONCILIAÇÃO — extrato de pagamento em lote do convênio (MOCK)
+   Cruza os itens do extrato com os procedimentos em aberto e
+   registra os pagamentos em massa. Ponto único para plugar a
+   leitura real depois: produzir { _fonte, itens:[...] } e chamar
+   aplicarConciliacao().
+   item: {procId?, codigo, procedimento, paciente, convenio, hospital,
+          competencia, valorApresentado, valorPago, dataPagamento, glosa, motivoGlosa}
+   ============================================================ */
+function conciliacaoScanMock(files){
+  // MOCK: não lê o arquivo. Simula um extrato que "encontrou" os
+  // procedimentos em aberto, pagos a ~90% do previsto (10% de glosa de tabela).
+  const r={ _fonte:{arquivos:[...files].map(f=>f.name), geradoEm:new Date().toISOString(), engine:'mock'}, itens:[] };
+  myProcs().map(p=>({p,c:cirOf(p.cirurgiaId)}))
+    .filter(x=>x.c && saldoAberto(x.p)>0)
+    .forEach(({p,c})=>{
+      const prev=+p.valorPrevisto||0;
+      r.itens.push({
+        procId:p.id, codigo:p.codigo, procedimento:p.nome||'',
+        paciente:c.paciente||'', convenio:convName(c.convenioId), hospital:hospName(c.hospitalId),
+        competencia:(c.dataCirurgia||todayISO()).slice(0,7),
+        valorApresentado:prev, valorPago: prev?Math.round(prev*90)/100:0,
+        dataPagamento:todayISO(), glosa: prev?Math.round(prev*10)/100:0, motivoGlosa: prev?'Diferença de tabela':''
+      });
+    });
+  return r;
+}
+function conciliacaoMatch(it){
+  if(it.procId){ const p=DB.procedimentos.find(x=>x.id===it.procId); if(p) return p; }
+  const code=String(it.codigo||'').replace(/\D/g,'');
+  if(!code) return null;
+  const cand=myProcs().map(p=>({p,c:cirOf(p.cirurgiaId)})).filter(x=>x.c
+    && String(x.p.codigo).replace(/\D/g,'')===code
+    && (!it.paciente || (x.c.paciente||'').toLowerCase()===String(it.paciente).toLowerCase()));
+  return cand.length===1 ? cand[0].p : null;
+}
+function openConciliacao(){
+  $('#modal-root').insertAdjacentHTML('beforeend', `
+  <div class="overlay" id="concOv" style="z-index:140">
+    <div class="modal lg">
+      <div class="modal-head"><h3>Documento de conciliação — pagamento em lote</h3><button class="x-btn" id="concX">&times;</button></div>
+      <div class="modal-body">
+        <p class="hint-txt" style="margin-top:0">Carregue o extrato de pagamento do convênio (PDF, planilha ou foto). O sistema cruza os itens com os procedimentos em aberto e registra os pagamentos em massa.</p>
+        <input type="file" id="concFile" accept="image/*,application/pdf,.csv,.xlsx,.xls" multiple>
+        <div id="concReview" style="margin-top:14px"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" id="concCancel">Fechar</button>
+        <button class="btn btn-primary" style="width:auto;display:none" id="concApply">Aplicar</button>
+      </div>
+    </div>
+  </div>`);
+  const ov=$('#concOv'); const close=()=>ov.remove();
+  $('#concX').onclick=close; $('#concCancel').onclick=close;
+  ov.onclick=e=>{ if(e.target.id==='concOv') close(); };
+  let result=null;
+  $('#concFile').onchange=e=>{
+    const files=[...e.target.files]; if(!files.length) return;
+    result=conciliacaoScanMock(files);
+    $('#concReview').innerHTML=conciliacaoReviewHtml(result);
+    const n=(result.itens||[]).filter(conciliacaoMatch).length;
+    const btn=$('#concApply'); btn.style.display=''; btn.disabled=!n;
+    btn.textContent = n ? `Aplicar a ${n} procedimento(s)` : 'Nenhuma correspondência';
+  };
+  $('#concApply').onclick=()=>{
+    if(!result) return;
+    const n=aplicarConciliacao(result);
+    close(); toast(n?`${n} procedimento(s) conciliado(s)`:'Nenhum item correspondeu'); render();
+  };
+}
+function conciliacaoReviewHtml(r){
+  const itens=r.itens||[];
+  const matched=itens.filter(conciliacaoMatch).length;
+  return `
+  <div class="hint-txt" style="background:var(--amber-soft);color:var(--amber);border-radius:8px;padding:9px 11px;margin-bottom:10px">
+    ⚠ Conciliação em modo demonstração (mock): os itens abaixo <b>não</b> foram lidos do arquivo. Estrutura pronta para plugar a leitura real do extrato.
+  </div>
+  <div class="hint-txt" style="margin-bottom:8px">${itens.length} item(ns) no extrato · <b>${matched}</b> com correspondência nos procedimentos em aberto.</div>
+  <div class="t-wrap"><table><thead><tr>
+    <th>Código</th><th>Paciente</th><th>Convênio</th><th>Hospital</th><th class="num">Apresentado</th><th class="num">Pago</th><th class="num">Glosa</th><th>Data pgto</th><th></th>
+  </tr></thead><tbody>
+    ${itens.map(it=>{
+      const m=conciliacaoMatch(it);
+      return `<tr>
+        <td style="font-variant-numeric:tabular-nums">${esc(fmtCbhpm(it.codigo))}</td>
+        <td>${esc(it.paciente||'')}</td>
+        <td>${esc(it.convenio||'')}</td>
+        <td>${esc(it.hospital||'')}</td>
+        <td class="num">${money(it.valorApresentado)}</td>
+        <td class="num" style="color:var(--green)">${money(it.valorPago)}</td>
+        <td class="num" style="color:${(+it.glosa||0)>0?'var(--red)':'var(--muted)'}">${(+it.glosa||0)>0?money(it.glosa):'—'}</td>
+        <td>${fmtDate(it.dataPagamento)}</td>
+        <td>${m?'<span class="badge b-green">✓ corresponde</span>':'<span class="badge b-gray">—</span>'}</td>
+      </tr>`;
+    }).join('')}
+  </tbody></table></div>
+  <div class="hint-txt" style="margin-top:8px">Apenas as linhas “✓ corresponde” serão aplicadas (valor pago, data e — se vazio — valor apresentado como previsto).</div>`;
+}
+function aplicarConciliacao(r){
+  let n=0;
+  (r.itens||[]).forEach(it=>{
+    const p=conciliacaoMatch(it); if(!p) return;
+    if(it.valorPago!=null) p.valorPago=+it.valorPago||0;
+    if(it.dataPagamento) p.dataPagamento=it.dataPagamento;
+    if(!(+p.valorPrevisto||0) && (+it.valorApresentado||0)) p.valorPrevisto=+it.valorApresentado||0;
+    n++;
+  });
+  if(n) save();
+  return n;
+}
+
+function saveCirurgia(){
+  syncCirDraft();
+  const d=draft;
+  d.paciente = acronimoNome(d.paciente);   // minimização: só iniciais são gravadas
+  const fail=(tab,msg)=>{ d._tab=tab; renderCirModal(); toast(msg); };
+  if(!(d.paciente||'').trim()) return fail(1,'Informe a identificação do paciente');
+  if(!d.convenioId) return fail(1,'Selecione o convênio');
+  if(!d.hospitalId) return fail(1,'Selecione o hospital');
+  if(!d.dataCirurgia) return fail(1,'Informe a data da cirurgia');
+  const procs=d.procs.filter(p=>p.codigo);
+  if(!procs.length) return fail(2,'Adicione ao menos um procedimento');
+
+  if(d.id){
+    const c=cirOf(d.id);
+    Object.assign(c,{paciente:d.paciente,prontuario:d.prontuario||'',convenioId:d.convenioId,hospitalId:d.hospitalId,dataSolicitacao:d.dataSolicitacao,dataCirurgia:d.dataCirurgia,carater:d.carater,papel:d.papel,obs:d.obs});
+    DB.procedimentos=DB.procedimentos.filter(p=>p.cirurgiaId!==d.id);
+  } else {
+    d.id=uid('cir');
+    DB.cirurgias.push({id:d.id,medicoId:M(),paciente:d.paciente,prontuario:d.prontuario||'',convenioId:d.convenioId,hospitalId:d.hospitalId,dataSolicitacao:d.dataSolicitacao,dataCirurgia:d.dataCirurgia,carater:d.carater,papel:d.papel,obs:d.obs});
+  }
+  procs.forEach(p=>{
+    DB.procedimentos.push({
+      id:uid('prc'),cirurgiaId:d.id,codigo:p.codigo,nome:p.nome,porte:p.porte,qtd:+p.qtd||1,
+      statusPlano:p.statusPlano,statusAuditoria:p.statusAuditoria,
+      motivoRecusa:p.statusAuditoria==='Recusado'?(p.motivoRecusa||''):'',
+      valorPrevisto:+p.valorPrevisto||0,valorPago:+p.valorPago||0,dataPagamento:p.dataPagamento||''
+    });
+  });
+  save(); $('#modal-root').innerHTML=''; toast('Cirurgia salva'); render();
+}
+
+/* ============================================================
+   VIEW: PAGAMENTOS
+   ============================================================ */
+function viewPagamentos(){
+  const root=$('#viewRoot');
+  const f=state.filters.pg=Object.assign({local:'',pac:'',proc:'',de:'',ate:'',status:'aberto',aging:''}, state.filters.pg||{});
+  // procedimentos recusados pelo plano não entram em pagamentos (não foram aprovados antes da cirurgia)
+  const all=myProcs().map(p=>({p,c:cirOf(p.cirurgiaId)})).filter(x=>x.c && x.p.statusPlano!=='Recusado');
+  const pacientes=[...new Set(myCirurgias().map(c=>c.paciente).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const procNames=[...new Set(all.map(({p})=>p.nome).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+
+  const ci=s=>String(s||'').toLowerCase();
+  const baseFilter=({p,c})=>{
+    if(f.local){ const q=ci(f.local); if(!ci(hospName(c.hospitalId)).includes(q) && !ci(convName(c.convenioId)).includes(q)) return false; }
+    if(f.pac && !ci(c.paciente).includes(ci(f.pac))) return false;
+    if(f.proc){
+      const q=ci(f.proc), qd=String(f.proc).replace(/\D/g,'');
+      const byName=ci(p.nome).includes(q);
+      const byCombo=ci(fmtCbhpm(p.codigo)+' — '+p.nome).includes(q);
+      const byCode=qd && String(p.codigo).replace(/\D/g,'').includes(qd);
+      if(!byName && !byCombo && !byCode) return false;
+    }
+    if(f.de && (c.dataCirurgia||'') < f.de) return false;
+    if(f.ate && (c.dataCirurgia||'') > f.ate) return false;
+    return true;
+  };
+  const statusFilter=({p})=>{
+    const s=situacao(p);
+    if(f.status==='aberto') return s==='A receber';
+    if(f.status==='pago') return s==='Pago'||s==='Glosa parcial';
+    if(f.status==='glosa') return s==='Glosa parcial'||s==='Glosado';
+    return true;
+  };
+  const applyFilters=()=>all.filter(x=>baseFilter(x)&&statusFilter(x))
+    .sort((a,b)=>(a.c.dataCirurgia||'').localeCompare(b.c.dataCirurgia||''));
+
+  const agingOf = c => daysSince(c.dataCirurgia)<=90 ? 'ate90' : 'mais90';
+  const sumSaldo = arr => arr.reduce((s,x)=>s+saldoAberto(x.p),0);
+
+  const cardActive = key => {
+    if(key==='receb') return f.status==='pago' && !f.aging;
+    if(key==='glosa') return f.status==='glosa' && !f.aging;
+    if(key==='total') return f.status==='aberto' && !f.aging;
+    return f.status==='aberto' && f.aging===key;   // ate90 / mais90
+  };
+  const cardClick = key => {
+    if(cardActive(key)) { f.status='aberto'; f.aging=''; }
+    else if(key==='receb') { f.status='pago'; f.aging=''; }
+    else if(key==='glosa') { f.status='glosa'; f.aging=''; }
+    else if(key==='total') { f.status='aberto'; f.aging=''; }
+    else { f.status='aberto'; f.aging=key; }
+    const sel=$('#pgst'); if(sel) sel.value=f.status;
+    paint();
+  };
+  const kpisHtml = () => {
+    const cb = all.filter(baseFilter);
+    const receb = cb.filter(x=>['Pago','Glosa parcial'].includes(situacao(x.p)));
+    const glosa = cb.filter(x=>['Glosa parcial','Glosado'].includes(situacao(x.p)));
+    const open  = cb.filter(x=>saldoAberto(x.p)>0);
+    const rec90 = open.filter(x=>agingOf(x.c)==='ate90');
+    const old90 = open.filter(x=>agingOf(x.c)==='mais90');
+    const sumPago  = arr=>arr.reduce((s,x)=>s+(+x.p.valorPago||0),0);
+    const sumGlosa = arr=>arr.reduce((s,x)=>s+glosaDe(x.p),0);
+    const card = (key,color,label,val,n) => {
+      const on = cardActive(key);
+      return `<div class="kpi klick" data-card="${key}" style="border-left:4px solid ${color}${on?`;box-shadow:inset 0 0 0 2px ${color}`:''}">
+        <div class="label">${label}</div><div class="value">${money0(val)}</div><div class="hint">${n} procedimento(s)</div></div>`;
+    };
+    return `<div class="kpi-row">
+      ${card('receb','#15803d','Recebido', sumPago(receb), receb.length)}
+      ${card('total','#eab308','A receber — total', sumSaldo(open), open.length)}
+      ${card('ate90','#f59e0b','A receber — até 90 dias', sumSaldo(rec90), rec90.length)}
+      ${card('mais90','#b45309','A receber — acima de 90 dias', sumSaldo(old90), old90.length)}
+      ${card('glosa','#b91c1c','Glosa', sumGlosa(glosa), glosa.length)}
+    </div>`;
+  };
+
+  root.innerHTML=`
+    <div class="page-head">
+      <div><h1>Pagamentos</h1><p>Dê baixa nos recebimentos e registre glosas</p></div>
+      <button class="btn btn-primary" style="width:auto" id="concBtn">📄 Documento de conciliação</button>
+    </div>
+    <div id="pgCards"></div>
+    <div class="toolbar">
+      <input class="search" id="pglocal" list="dlLocalPg" placeholder="Convênio ou hospital..." value="${esc(f.local)}">
+      <input class="search" id="pgpac" list="dlPacPg" placeholder="Paciente..." value="${esc(f.pac)}">
+      <input class="search" id="pgproc" list="dlProcPg" placeholder="Código ou nome do procedimento..." value="${esc(f.proc)}">
+      <select id="pgst">
+        <option value="aberto" ${f.status==='aberto'?'selected':''}>A receber</option>
+        <option value="pago" ${f.status==='pago'?'selected':''}>Recebidos</option>
+        <option value="glosa" ${f.status==='glosa'?'selected':''}>Glosados</option>
+        <option value="todos" ${f.status==='todos'?'selected':''}>Todos</option>
+      </select>
+      <span class="flt-range">Cirurgia de <input type="date" id="pgde" value="${f.de||''}"> até <input type="date" id="pgate" value="${f.ate||''}"></span>
+      <button class="btn btn-sm btn-ghost" id="pgclear">Limpar</button>
+    </div>
+    <datalist id="dlLocalPg">${localOptions().map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist>
+    <datalist id="dlPacPg">${pacientes.map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist>
+    <datalist id="dlProcPg">${procNames.map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist>
+    <div id="pgListWrap"></div>`;
+
+  const paint=()=>{
+    const base=applyFilters();
+    const procs = f.aging ? base.filter(x=>agingOf(x.c)===f.aging) : base;
+    $('#pgCards').innerHTML=kpisHtml();
+    $$('#pgCards [data-card]').forEach(el=>el.onclick=()=>cardClick(el.dataset.card));
+    $('#pgListWrap').innerHTML=`
+    <div class="card"><div class="card-body flush"><div class="t-wrap">
+    ${procs.length?`<table><thead><tr>
+      <th>Data cir.</th><th>Dias</th><th>Paciente</th><th>Convênio</th><th>Hospital</th><th>Procedimento</th>
+      <th class="num">Previsto</th><th class="num">Pago</th><th>Situação</th><th></th>
+    </tr></thead><tbody>
+      ${procs.map(({p,c})=>{const s=situacao(p);const d=daysSince(c.dataCirurgia);return `<tr>
+        <td>${fmtDate(c.dataCirurgia)}</td>
+        <td><span class="badge ${d>90?'b-red':d>60?'b-amber':'b-gray'}">${d}d</span></td>
+        <td><b>${esc(c.paciente)}</b></td>
+        <td>${esc(convName(c.convenioId))}</td>
+        <td>${esc(hospName(c.hospitalId))}</td>
+        <td><span style="font-variant-numeric:tabular-nums;color:var(--muted)">${fmtCbhpm(p.codigo)}</span><br>${esc(p.nome)}</td>
+        <td class="num">${money(p.valorPrevisto)}</td>
+        <td class="num" style="color:var(--green)">${p.valorPago?money(p.valorPago):'—'}</td>
+        <td><span class="badge ${SIT_BADGE[s]}">${s}</span>${p.dataPagamento?`<div class="hint-txt">${fmtDate(p.dataPagamento)}</div>`:''}${p.statusAuditoria==='Recusado'&&p.motivoRecusa?`<div class="hint-txt" style="color:var(--red)">Recusa: ${esc(p.motivoRecusa)}</div>`:''}</td>
+        <td class="num"><button class="btn btn-sm" data-baixa="${p.id}">${p.dataPagamento?'Editar':'Dar baixa'}</button></td>
+      </tr>`;}).join('')}
+    </tbody></table>`:emptyState('Nada por aqui','Nenhum procedimento nesta situação / filtro.')}
+    </div></div></div>`;
+    $$('#pgListWrap [data-baixa]').forEach(b=>b.onclick=()=>openBaixa(b.dataset.baixa));
+  };
+
+  $('#concBtn').onclick=openConciliacao;
+  const upd=(id,key,ev='input')=>{ const el=$('#'+id); el.addEventListener(ev,()=>{ f[key]=el.value; paint(); }); };
+  upd('pglocal','local'); upd('pgpac','pac'); upd('pgproc','proc');
+  upd('pgst','status','change'); upd('pgde','de','change'); upd('pgate','ate','change');
+  $('#pgclear').onclick=()=>{ Object.assign(f,{local:'',pac:'',proc:'',de:'',ate:'',status:'aberto',aging:''}); viewPagamentos(); };
+  paint();
+}
+
+function openBaixa(procId){
+  const p=DB.procedimentos.find(x=>x.id===procId); if(!p) return;
+  const c=cirOf(p.cirurgiaId);
+  const editando = !!p.dataPagamento;
+  const d={valorPago:p.valorPago||p.valorPrevisto, dataPagamento:p.dataPagamento||todayISO(), statusPlano:p.statusPlano, statusAuditoria:p.statusAuditoria};
+  $('#modal-root').innerHTML=`
+  <div class="overlay" id="ov"><div class="modal" style="max-width:460px">
+    <div class="modal-head"><h3>${editando?'Editar baixa':'Baixa de pagamento'}</h3><button class="x-btn" id="mx">&times;</button></div>
+    <div class="modal-body">
+      <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:11px 13px;margin-bottom:14px;font-size:13px">
+        <b>${esc(c.paciente)}</b> · ${esc(convName(c.convenioId))}<br>
+        <span style="color:var(--muted)">${fmtCbhpm(p.codigo)} — ${esc(p.nome)}</span><br>
+        Previsto: <b>${money(p.valorPrevisto)}</b>
+      </div>
+      <div class="stack">
+        <div class="field"><label>Valor pago (R$)</label><input id="b-pago" type="number" step="0.01" value="${d.valorPago}"></div>
+        <div class="field"><label>Data do pagamento</label><input id="b-data" type="date" value="${d.dataPagamento}"></div>
+        <div class="field"><label>Status do plano</label><select id="b-plano">${['Aguarda Aprovação','Aprovado','Recusado'].map(x=>`<option ${d.statusPlano===x?'selected':''}>${x}</option>`).join('')}</select></div>
+        <div class="field"><label>Status da auditoria</label><select id="b-aud">${['Aguarda Auditoria','Aprovado','Recusado','—'].map(x=>`<option ${d.statusAuditoria===x?'selected':''}>${x}</option>`).join('')}</select></div>
+        <div class="field" id="b-motivo-wrap" ${d.statusAuditoria==='Recusado'?'':'hidden'}><label>Motivo da recusa</label><select id="b-motivo"><option value="">Selecione o motivo...</option>${MOTIVOS_RECUSA.map(m=>`<option ${p.motivoRecusa===m?'selected':''}>${esc(m)}</option>`).join('')}</select></div>
+        <div class="hint-txt" id="b-glosa"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      ${editando?`<button class="btn btn-danger" id="b-limpar" style="margin-right:auto">Reabrir (limpar baixa)</button>`:`<button class="btn" id="b-limpar" style="margin-right:auto">Limpar baixa</button>`}
+      <button class="btn" id="mcancel">Cancelar</button>
+      <button class="btn btn-primary" style="width:auto" id="msave">${editando?'Salvar':'Confirmar baixa'}</button>
+    </div>
+  </div></div>`;
+  const close=()=>$('#modal-root').innerHTML='';
+  $('#ov').onclick=e=>{if(e.target.id==='ov')close();};
+  $('#mx').onclick=close;$('#mcancel').onclick=close;
+  const upGlosa=()=>{ const g=(+p.valorPrevisto||0)-(+$('#b-pago').value||0); $('#b-glosa').textContent = g>0?`Glosa registrada: ${money(g)}`:(g<0?'Valor pago acima do previsto':''); $('#b-glosa').style.color=g>0?'var(--red)':'var(--muted)'; };
+  $('#b-pago').oninput=upGlosa; upGlosa();
+  $('#b-aud').onchange=()=>{ $('#b-motivo-wrap').hidden = $('#b-aud').value!=='Recusado'; };
+  $('#b-limpar').onclick=()=>{ p.valorPago=0;p.dataPagamento=''; save();close();toast('Baixa removida');render(); };
+  $('#msave').onclick=()=>{
+    p.valorPago=+$('#b-pago').value||0;
+    p.dataPagamento=$('#b-data').value||todayISO();
+    p.statusPlano=$('#b-plano').value;
+    p.statusAuditoria=$('#b-aud').value;
+    p.motivoRecusa = p.statusAuditoria==='Recusado' ? ($('#b-motivo').value||'') : '';
+    save(); close(); toast('Baixa registrada'); render();
+  };
+}
+
+/* ============================================================
+   VIEW: RECEBÍVEIS (AGING)
+   ============================================================ */
+const REC_GROUPS = [
+  {k:'conv', label:'Convênio',     keyOf:x=>x.c.convenioId,  nameOf:id=>convName(id)},
+  {k:'hosp', label:'Hospital',     keyOf:x=>x.c.hospitalId,  nameOf:id=>hospName(id)},
+  {k:'proc', label:'Procedimento', keyOf:x=>x.p.codigo||'—', nameOf:code=>{const r=CBHPM_BY_CODE[code]; return r?`${fmtCbhpm(code)} — ${r.nome}`:(code||'—');}},
+];
+function viewRecebiveis(){
+  const root=$('#viewRoot');
+  const f = state.filters.rec = Object.assign({bucket:'', group:'conv'}, state.filters.rec||{});
+  const openAll = myProcs().map(p=>({p,c:cirOf(p.cirurgiaId)})).filter(x=>x.c && saldoAberto(x.p)>0);
+  const coarse = c => { const d=daysSince(c.dataCirurgia); return d<=60?'0-60':d<=120?'61-120':'+120'; };
+  const sumSaldo = arr => arr.reduce((s,x)=>s+saldoAberto(x.p),0);
+
+  root.innerHTML=`
+    <div class="page-head"><div><h1>Recebíveis (aging)</h1><p>Valor a receber por faixa de tempo desde a <b>data da cirurgia</b></p></div></div>
+    <div id="recBody"></div>`;
+
+  const paint = () => {
+    const b060  = openAll.filter(x=>coarse(x.c)==='0-60');
+    const b120  = openAll.filter(x=>coarse(x.c)==='61-120');
+    const bMais = openAll.filter(x=>coarse(x.c)==='+120');
+    const rows  = f.bucket ? openAll.filter(x=>coarse(x.c)===f.bucket) : openAll.slice();
+
+    const bcard = (key,color,label,arr) => {
+      const on = key==='total' ? !f.bucket : f.bucket===key;
+      return `<div class="kpi klick" data-bucket="${key}" style="border-left:4px solid ${color}${on?`;box-shadow:inset 0 0 0 2px ${color}`:''}">
+        <div class="label">${label}</div><div class="value">${money0(sumSaldo(arr))}</div><div class="hint">${arr.length} procedimento(s)</div></div>`;
+    };
+    const gcard = x => `<div class="kpi klick" data-group="${x.k}" style="${f.group===x.k?'box-shadow:inset 0 0 0 2px var(--accent);':''}">
+      <div class="label">Detalhar lista por</div><div class="value" style="font-size:16px">${x.label}</div></div>`;
+
+    const g = REC_GROUPS.find(x=>x.k===f.group) || REC_GROUPS[0];
+    const map={};
+    rows.forEach(x=>{ const k=g.keyOf(x); const bkt=bucketOf(x.c.dataCirurgia);
+      (map[k]=map[k]||Object.fromEntries(BUCKETS.map(z=>[z,0])))[bkt]+=saldoAberto(x.p); });
+    const gkeys=Object.keys(map).sort((a,b)=>rowTot(map[b])-rowTot(map[a]));
+    const gtot=sumSaldo(rows);
+    const breakdown = gkeys.length ? `<div class="t-wrap"><table><thead><tr><th>${g.label}</th>${BUCKETS.map(z=>`<th class="num">${z} dias</th>`).join('')}<th class="num">Total</th></tr></thead><tbody>
+        ${gkeys.map(k=>`<tr><td><b>${esc(g.nameOf(k))}</b></td>${BUCKETS.map(z=>`<td class="num">${map[k][z]?money0(map[k][z]):'<span style="color:var(--border)">—</span>'}</td>`).join('')}<td class="num" style="font-weight:700">${money0(rowTot(map[k]))}</td></tr>`).join('')}
+        <tr style="background:var(--surface-2)"><td style="font-weight:700">Total</td>${BUCKETS.map(z=>`<td class="num" style="font-weight:700">${money0(gkeys.reduce((s,k)=>s+map[k][z],0))}</td>`).join('')}<td class="num" style="font-weight:700">${money0(gtot)}</td></tr>
+      </tbody></table></div>` : '<div class="empty" style="padding:24px">Sem valores em aberto neste filtro.</div>';
+
+    rows.sort((a,b)=>daysSince(b.c.dataCirurgia)-daysSince(a.c.dataCirurgia));
+    const detail = rows.length ? `<table><thead><tr><th>Data cir.</th><th>Dias</th><th>Faixa</th><th>Paciente</th><th>Convênio</th><th>Hospital</th><th>Procedimento</th><th class="num">A receber</th></tr></thead><tbody>
+        ${rows.map(({p,c})=>{const d=daysSince(c.dataCirurgia);return `<tr class="row-click" data-cir="${c.id}"><td>${fmtDate(c.dataCirurgia)}</td><td><span class="badge ${d>90?'b-red':d>60?'b-amber':'b-gray'}">${d}d</span></td><td>${bucketOf(c.dataCirurgia)}</td><td><b>${esc(c.paciente)}</b></td><td>${esc(convName(c.convenioId))}</td><td>${esc(hospName(c.hospitalId))}</td><td>${esc(p.nome)}</td><td class="num">${money(saldoAberto(p))}</td></tr>`;}).join('')}
+      </tbody></table>` : emptyState('Nenhum recebível em aberto','Tudo em dia! 🎉');
+
+    $('#recBody').innerHTML = `
+      <div class="kpi-row">
+        ${bcard('total','#0f766e','Total a receber', openAll)}
+        ${bcard('0-60','#15803d','Recente · 0–60 dias', b060)}
+        ${bcard('61-120','#b45309','61–120 dias', b120)}
+        ${bcard('+120','#b91c1c','Vencido · +120 dias', bMais)}
+      </div>
+      <div class="kpi-row">${REC_GROUPS.map(gcard).join('')}</div>
+      <div class="card"><div class="card-head"><h3>Aging por ${g.label.toLowerCase()}</h3></div><div class="card-body flush">${breakdown}</div></div>
+      <div class="card"><div class="card-head"><h3>Procedimentos em aberto (${rows.length})</h3></div><div class="card-body flush"><div class="t-wrap">${detail}</div></div></div>`;
+
+    $$('#recBody [data-bucket]').forEach(el=>el.onclick=()=>{ const k=el.dataset.bucket; f.bucket = k==='total'?'':(f.bucket===k?'':k); paint(); });
+    $$('#recBody [data-group]').forEach(el=>el.onclick=()=>{ f.group=el.dataset.group; paint(); });
+    $$('#recBody [data-cir]').forEach(tr=>tr.onclick=()=>openCirurgia(tr.dataset.cir));
+  };
+  paint();
+}
+function rowTot(o){ return Object.values(o).reduce((a,b)=>a+b,0); }
+
+/* ============================================================
+   VIEW: RESUMO EXECUTIVO
+   ============================================================ */
+function diffDays(a,b){ if(!a||!b) return 0; return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000); }
+function hbars(rows, fmt, colorFn){
+  if(!rows.length) return `<div class="hint-txt" style="padding:8px 2px">Sem dados no período.</div>`;
+  const max=Math.max(1,...rows.map(r=>r.value));
+  return `<div class="hbars">${rows.map(r=>{
+    const col=(colorFn&&colorFn(r))||r.color||'var(--accent)';
+    return `<div class="hbar">
+      <div class="hbar-lbl">${esc(r.label)}${r.sub?`<span class="hbar-sub">${esc(r.sub)}</span>`:''}</div>
+      <div class="hbar-track"><div class="hbar-fill" style="width:${Math.max(2,r.value/max*100)}%;background:${col}"></div></div>
+      <div class="hbar-val">${fmt?fmt(r.value):r.value}</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+const MES_ABREV=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+function lastNMonths(n){
+  const out=[], d=new Date();
+  for(let i=n-1;i>=0;i--){ const dt=new Date(d.getFullYear(), d.getMonth()-i, 1);
+    out.push({ ym:`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`, label:`${MES_ABREV[dt.getMonth()]}/${String(dt.getFullYear()).slice(2)}` });
+  }
+  return out;
+}
+function monthlyChartSVG(rows){
+  if(!rows.some(r=>r.previsto>0||r.cir>0)) return '<div class="empty" style="padding:24px">Sem cirurgias nos últimos 12 meses.</div>';
+  const W=760,H=240,padL=6,padR=6,padT=24,padB=32;
+  const plotH=H-padT-padB, plotW=W-padL-padR, slot=plotW/rows.length;
+  const bw=Math.min(40,slot*0.56);
+  const maxV=Math.max(1,...rows.map(r=>r.recebido+r.aberto+r.glosa));
+  const grid=[0,.25,.5,.75,1].map(t=>{
+    const yy=padT+plotH-t*plotH;
+    return `<line x1="${padL}" x2="${W-padR}" y1="${yy}" y2="${yy}" stroke="#e3e8ee" stroke-width="1"/>`+
+      (t>0?`<text x="${W-padR}" y="${yy-3}" text-anchor="end" font-size="9" fill="#64748b">${money0(maxV*t)}</text>`:'');
+  }).join('');
+  const bars=rows.map((r,i)=>{
+    const x=padL+i*slot+(slot-bw)/2;
+    let acc=0,seg='';
+    [['recebido','#15803d'],['aberto','#b45309'],['glosa','#b91c1c']].forEach(([k,col])=>{
+      const val=r[k]||0; if(val<=0) return;
+      const h=val/maxV*plotH, yy=padT+plotH-acc-h;
+      seg+=`<rect x="${x.toFixed(1)}" y="${yy.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1,h-2).toFixed(1)}" rx="1.5" fill="${col}"><title>${esc(r.label)} · ${k}: ${money(val)}</title></rect>`;
+      acc+=h;
+    });
+    const tot=r.recebido+r.aberto+r.glosa;
+    return seg+
+      `<text x="${(x+bw/2).toFixed(1)}" y="${(padT+plotH-acc-6).toFixed(1)}" text-anchor="middle" font-size="9.5" font-weight="700" fill="#1c2733">${r.cir||''}</text>`+
+      `<text x="${(x+bw/2).toFixed(1)}" y="${H-padB+13}" text-anchor="middle" font-size="9" fill="#64748b">${r.label}</text>`;
+  }).join('');
+  return `<div class="t-wrap"><svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:560px;height:auto;display:block">
+    <text x="${padL}" y="12" font-size="9.5" fill="#64748b">altura = recebido + a receber + glosa · número acima = nº de cirurgias no mês</text>
+    ${grid}${bars}
+  </svg></div>`;
+}
+
+function viewResumo(){
+  const root=$('#viewRoot');
+  const d=new Date();
+  let range = { de:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`,
+                ate:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(new Date(d.getFullYear(),d.getMonth()+1,0).getDate()).padStart(2,'0')}` };
+
+  const psAll = myProcs().map(p=>({p,c:cirOf(p.cirurgiaId)})).filter(x=>x.c);
+  const cirAll = myCirurgias();
+
+  // ---- gráfico mensal fixo (12 meses, independente do filtro) ----
+  const monthly = lastNMonths(12).map(mo=>{
+    const rows=psAll.filter(x=>(x.c.dataCirurgia||'').slice(0,7)===mo.ym);
+    const cs=new Set(rows.map(x=>x.c.id));
+    return { ...mo, cir:cs.size,
+      previsto: rows.reduce((s,x)=>s+(+x.p.valorPrevisto||0),0),
+      recebido: rows.reduce((s,x)=>s+(+x.p.valorPago||0),0),
+      aberto:   rows.reduce((s,x)=>s+saldoAberto(x.p),0),
+      glosa:    rows.reduce((s,x)=>s+glosaDe(x.p),0) };
+  });
+
+  root.innerHTML=`
+    <div class="page-head"><div><h1>Resumo executivo</h1><p>Indicadores gerenciais de faturamento, recebimento e glosa</p></div></div>
+    <div class="toolbar">
+      <span class="rng">Período (data da cirurgia) de <input type="date" id="rDe"> até <input type="date" id="rAte"></span>
+      <button class="btn btn-sm" data-preset="0">Mês atual</button>
+      <button class="btn btn-sm" data-preset="2">3 meses</button>
+      <button class="btn btn-sm" data-preset="11">12 meses</button>
+      <button class="btn btn-sm" data-preset="all">Tudo</button>
+    </div>
+    <div class="card"><div class="card-head"><h3>Evolução mensal — últimos 12 meses</h3></div><div class="card-body">
+      ${monthlyChartSVG(monthly)}
+      <div class="mlegend"><span><i style="background:#15803d"></i>Recebido</span><span><i style="background:#b45309"></i>A receber</span><span><i style="background:#b91c1c"></i>Glosa</span></div>
+    </div></div>
+    <div id="resBody"></div>`;
+
+  const nameConv = k => convName(k);
+  const nameHosp = k => hospName(k);
+  const nameProc = k => { const r=CBHPM_BY_CODE[k]; return r ? `${fmtCbhpm(k)} — ${r.nome}` : (k||'—'); };
+
+  const paint = () => {
+    $('#rDe').value=range.de; $('#rAte').value=range.ate;
+    const inRange = c => (!range.de || (c.dataCirurgia||'')>=range.de) && (!range.ate || (c.dataCirurgia||'')<=range.ate);
+    const S = psAll.filter(x=>inRange(x.c));
+    const cirN = new Set(S.map(x=>x.c.id)).size;
+    const prev=S.reduce((s,x)=>s+(+x.p.valorPrevisto||0),0);
+    const pago=S.reduce((s,x)=>s+(+x.p.valorPago||0),0);
+    const aberto=S.reduce((s,x)=>s+saldoAberto(x.p),0);
+    const glosa=S.reduce((s,x)=>s+glosaDe(x.p),0);
+    const taxa = prev? pago/prev*100 : 0;
+
+    // prazo médio de pagamento (cirurgia → pagamento) p/ procedimentos efetivamente recebidos
+    const paidRows = S.filter(x=>x.p.dataPagamento && (+x.p.valorPago||0)>0);
+    const prazoBy = keyFn => {
+      const m={}; paidRows.forEach(x=>{ const k=keyFn(x); (m[k]=m[k]||{sum:0,n:0}); m[k].sum+=diffDays(x.c.dataCirurgia,x.p.dataPagamento); m[k].n++; });
+      return m;
+    };
+    const prazoRows = (m,nameFn) => Object.entries(m).map(([k,o])=>({label:nameFn(k),value:Math.round(o.sum/o.n),sub:`${o.n} pgto(s)`})).sort((a,b)=>b.value-a.value);
+    const prazoGlobal = paidRows.length ? Math.round(paidRows.reduce((s,x)=>s+diffDays(x.c.dataCirurgia,x.p.dataPagamento),0)/paidRows.length) : 0;
+
+    // aderência ao CBHPM: pago / previsto sobre procedimentos com pagamento registrado
+    const settled = S.filter(x=>x.p.dataPagamento);
+    const aderRows = (keyFn,nameFn) => {
+      const m={}; settled.forEach(x=>{ const k=keyFn(x); (m[k]=m[k]||{pago:0,prev:0}); m[k].pago+=+x.p.valorPago||0; m[k].prev+=+x.p.valorPrevisto||0; });
+      return Object.entries(m).filter(([,o])=>o.prev>0)
+        .map(([k,o])=>({label:nameFn(k), value:Math.round(o.pago/o.prev*100), sub:`${money0(o.pago)} de ${money0(o.prev)}`}))
+        .sort((a,b)=>a.value-b.value);
+    };
+    const aderColor = r => r.value>=95?'#15803d':r.value>=85?'#b45309':'#b91c1c';
+
+    // procedimentos mais glosados + motivo dominante
+    const glProc={};
+    S.forEach(x=>{ const g=glosaDe(x.p); if(g<=0) return; const k=x.p.codigo||'—';
+      (glProc[k]=glProc[k]||{v:0,n:0,mot:{}}); glProc[k].v+=g; glProc[k].n++;
+      if(x.p.motivoRecusa) glProc[k].mot[x.p.motivoRecusa]=(glProc[k].mot[x.p.motivoRecusa]||0)+1; });
+    const glProcRows = Object.entries(glProc).map(([k,o])=>{
+      const tm=Object.entries(o.mot).sort((a,b)=>b[1]-a[1])[0];
+      return {label:nameProc(k), value:o.v, sub:`${o.n}× ${tm?'· '+tm[0]:''}`, color:'#b91c1c'};
+    }).sort((a,b)=>b.value-a.value).slice(0,8);
+
+    // glosa da auditoria por motivo
+    const glMot={};
+    S.forEach(x=>{ if(x.p.statusAuditoria!=='Recusado') return; const k=x.p.motivoRecusa||'(motivo não informado)';
+      (glMot[k]=glMot[k]||{v:0,n:0}); glMot[k].v+=(+x.p.valorPrevisto||0); glMot[k].n++; });
+    const glMotRows=Object.entries(glMot).map(([k,o])=>({label:k,value:o.v,sub:`${o.n}×`,color:'#b45309'})).sort((a,b)=>b.value-a.value);
+
+    // plano que mais recusou + hospital
+    const recP={};
+    S.forEach(x=>{ if(x.p.statusPlano!=='Recusado' && x.p.statusAuditoria!=='Recusado') return;
+      const k=x.c.convenioId; (recP[k]=recP[k]||{n:0,h:{}}); recP[k].n++; recP[k].h[x.c.hospitalId]=(recP[k].h[x.c.hospitalId]||0)+1; });
+    const recPRows=Object.entries(recP).map(([k,o])=>{
+      const th=Object.entries(o.h).sort((a,b)=>b[1]-a[1])[0];
+      return {label:convName(k), value:o.n, sub: th?`+ recusas: ${hospName(th[0])} (${th[1]})`:'', color:'#b91c1c'};
+    }).sort((a,b)=>b.value-a.value);
+
+    // ---- insights executivos ----
+    const ins=[];
+    const pc=prazoRows(prazoBy(x=>x.c.convenioId),nameConv)[0];
+    if(pc) ins.push(`<b>${esc(pc.label)}</b> é o convênio que mais demora a pagar: <b>${pc.value} dias</b> em média (média geral ${prazoGlobal} dias).`);
+    const ph=prazoRows(prazoBy(x=>x.c.hospitalId),nameHosp)[0];
+    if(ph && (!pc || ph.value>pc.value)) ins.push(`Pelo hospital, <b>${esc(ph.label)}</b> puxa o prazo para <b>${ph.value} dias</b>.`);
+    const ac=aderRows(x=>x.c.convenioId,nameConv)[0];
+    if(ac && ac.value<100) ins.push(`<b>${esc(ac.label)}</b> paga <b>${ac.value}%</b> do previsto pela CBHPM — ${100-ac.value}% abaixo (${ac.sub}).`);
+    if(glProcRows[0]) ins.push(`Procedimento mais glosado: <b>${esc(glProcRows[0].label)}</b> — ${money0(glProcRows[0].value)}.`);
+    if(recPRows[0]) ins.push(`<b>${esc(recPRows[0].label)}</b> lidera recusas: <b>${recPRows[0].value}</b> procedimento(s) ${recPRows[0].sub}.`);
+    ins.push(`Recebimento no período: <b>${taxa.toFixed(0)}%</b> do previsto (${money0(pago)} de ${money0(prev)}); a receber ${money0(aberto)}.`);
+
+    $('#resBody').innerHTML=`
+      <div class="insights"><h3>Principais insights</h3><ul>${ins.map(t=>`<li>${t}</li>`).join('')}</ul></div>
+      <div class="kpi-row">
+        <div class="kpi"><div class="label">Cirurgias no período</div><div class="value">${cirN}</div><div class="hint">${S.length} procedimentos</div></div>
+        <div class="kpi accent"><div class="label">Faturamento previsto</div><div class="value">${money0(prev)}</div></div>
+        <div class="kpi green"><div class="label">Recebido</div><div class="value">${money0(pago)}</div><div class="hint">${taxa.toFixed(0)}% do previsto</div></div>
+        <div class="kpi amber"><div class="label">A receber</div><div class="value">${money0(aberto)}</div></div>
+        <div class="kpi red"><div class="label">Glosa</div><div class="value">${money0(glosa)}</div></div>
+        <div class="kpi"><div class="label">Prazo médio de pagamento</div><div class="value">${prazoGlobal}<span style="font-size:14px"> dias</span></div><div class="hint">${paidRows.length} pagamento(s)</div></div>
+      </div>
+
+      <div class="sec-grid">
+        <div class="card"><div class="card-head"><h3>Prazo médio de pagamento — por convênio</h3><span class="hint-txt">dias desde a cirurgia</span></div><div class="card-body">${hbars(prazoRows(prazoBy(x=>x.c.convenioId),nameConv), v=>v+' d', ()=>'#1d4ed8')}</div></div>
+        <div class="card"><div class="card-head"><h3>Prazo médio de pagamento — por hospital</h3></div><div class="card-body">${hbars(prazoRows(prazoBy(x=>x.c.hospitalId),nameHosp), v=>v+' d', ()=>'#1d4ed8')}</div></div>
+      </div>
+
+      <div class="sec-grid">
+        <div class="card"><div class="card-head"><h3>Aderência à CBHPM — por convênio</h3><span class="hint-txt">% pago vs. previsto</span></div><div class="card-body">${hbars(aderRows(x=>x.c.convenioId,nameConv), v=>v+'%', aderColor)}</div></div>
+        <div class="card"><div class="card-head"><h3>Aderência à CBHPM — por hospital</h3></div><div class="card-body">${hbars(aderRows(x=>x.c.hospitalId,nameHosp), v=>v+'%', aderColor)}</div></div>
+      </div>
+
+      <div class="card"><div class="card-head"><h3>Procedimentos mais glosados</h3><span class="hint-txt">valor glosado · motivo dominante</span></div><div class="card-body">${hbars(glProcRows, money0)}</div></div>
+
+      <div class="sec-grid">
+        <div class="card"><div class="card-head"><h3>Glosa da auditoria por motivo</h3><span class="hint-txt">valor previsto recusado</span></div><div class="card-body">${hbars(glMotRows, money0)}</div></div>
+        <div class="card"><div class="card-head"><h3>Recusas por convênio</h3><span class="hint-txt">plano + hospital onde mais recusa</span></div><div class="card-body">${hbars(recPRows, v=>v)}</div></div>
+      </div>`;
+  };
+
+  $$('#viewRoot [data-preset]').forEach(b=>b.onclick=()=>{
+    const p=b.dataset.preset;
+    if(p==='all'){ range={de:'',ate:''}; }
+    else { const back=+p; const s=new Date(d.getFullYear(), d.getMonth()-back, 1); const e=new Date(d.getFullYear(), d.getMonth()+1, 0);
+      range={ de:`${s.getFullYear()}-${String(s.getMonth()+1).padStart(2,'0')}-01`, ate:`${e.getFullYear()}-${String(e.getMonth()+1).padStart(2,'0')}-${String(e.getDate()).padStart(2,'0')}` }; }
+    paint();
+  });
+  $('#rDe').onchange=e=>{ range.de=e.target.value; paint(); };
+  $('#rAte').onchange=e=>{ range.ate=e.target.value; paint(); };
+  paint();
+}
+
+/* ============================================================
+   VIEW: CONVÊNIOS
+   ============================================================ */
+const CONV_CARD_COLORS = ['#0f766e','#4f46e5','#b45309','#be123c','#0369a1','#7c3aed','#15803d','#c2410c','#0891b2','#9333ea','#ca8a04','#1d4ed8','#db2777','#4d7c0f'];
+
+function viewConvenios(){
+  const root=$('#viewRoot');
+  const convs=myConvenios();
+  const cirById={}; myCirurgias().forEach(c=>cirById[c.id]=c);
+  const allOpen=myProcs().filter(p=>saldoAberto(p)>0).map(p=>{
+    const c=cirById[p.cirurgiaId]||{};
+    return {convId:c.convenioId, d:daysSince(c.dataCirurgia), v:saldoAberto(p)};
+  });
+
+  const cardHtml=(cv,i)=>{
+    const col=CONV_CARD_COLORS[i%CONV_CARD_COLORS.length];
+    const nHosp=(cv.hospitalIds||[]).length;
+    const open=allOpen.filter(x=>x.convId===cv.id);
+    const rec=open.filter(x=>x.d<=90), old=open.filter(x=>x.d>90);
+    const sum=arr=>arr.reduce((s,x)=>s+x.v,0);
+    const metric=(label,color,n,v)=>`
+      <div class="cc-metric">
+        <div class="mbar" style="background:${color}"></div>
+        <div class="mtxt">
+          <div class="mlabel">${label}</div>
+          <div class="mval"><span class="mn">${n}</span><span class="mv">${money(v)}</span></div>
+        </div>
+      </div>`;
+    return `<div class="conv-card" data-ed="${cv.id}" style="--cc:${col}">
+      <div class="cc-head">
+        <div class="cc-name">${esc(cv.nome)}</div>
+        <div class="cc-sub">${nHosp} ${nHosp===1?'hospital':'hospitais'}</div>
+        <div class="cc-edit">✎ Editar</div>
+      </div>
+      <div class="cc-metrics">
+        ${metric('Procedimentos a receber total','#eab308',open.length,sum(open))}
+        ${metric('Procedimentos a receber 0 a 90 dias','#f59e0b',rec.length,sum(rec))}
+        ${metric('Procedimentos a receber + de 90 dias','#b91c1c',old.length,sum(old))}
+      </div>
+    </div>`;
+  };
+
+  const f=state.filters.convList=state.filters.convList||{q:''};
+  const matchQ=(cv,q)=>{
+    if(!q) return true;
+    if(cv.nome.toLowerCase().includes(q)) return true;
+    return (cv.hospitalIds||[]).map(hospName).join(' ').toLowerCase().includes(q);
+  };
+
+  root.innerHTML=`
+    <div class="page-head"><div><h1>Convênios</h1><p>${convs.length} convênio(s) · procedimentos a receber por faixa de tempo desde a cirurgia</p></div>
+      <button class="btn btn-primary" style="width:auto" id="novo">+ Novo convênio</button></div>
+    <div class="toolbar"><input class="search" id="cvq" style="min-width:300px" placeholder="Buscar por convênio ou hospital..." value="${esc(f.q)}"></div>
+    <div id="convListWrap"></div>`;
+
+  const paint=()=>{
+    const q=f.q.trim().toLowerCase();
+    const list=convs.filter(cv=>matchQ(cv,q));
+    $('#convListWrap').innerHTML = list.length
+      ? `<div class="conv-grid">${list.map(cv=>cardHtml(cv,convs.indexOf(cv))).join('')}</div>`
+      : `<div class="card"><div class="card-body">${emptyState(convs.length?'Nenhum convênio corresponde à busca':'Nenhum convênio cadastrado','')}</div></div>`;
+    $$('#convListWrap [data-ed]').forEach(b=>b.onclick=()=>editConvenio(b.dataset.ed));
+  };
+  $('#cvq').oninput=e=>{ f.q=e.target.value; paint(); };
+  $('#novo').onclick=()=>editConvenio(null);
+  paint();
+}
+function editConvenio(id){
+  const cv=id?DB.convenios.find(c=>c.id===id):{id:null,nome:'',hospitalIds:[]};
+  const sel=new Set(cv.hospitalIds||[]);
+  const hs=myHospitais();
+  $('#modal-root').innerHTML=`
+  <div class="overlay" id="ov"><div class="modal" style="max-width:560px">
+    <div class="modal-head"><h3>${id?'Editar convênio':'Novo convênio'}</h3><button class="x-btn" id="mx">&times;</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Nome do convênio *</label><input id="c-nome" value="${esc(cv.nome)}"></div>
+      <label style="font-size:12px;font-weight:600;color:var(--muted);margin:6px 0 6px;display:block">Hospitais atendidos por este convênio</label>
+      ${hs.length?`<div class="checks">${hs.map(h=>`<label><input type="checkbox" value="${h.id}" ${sel.has(h.id)?'checked':''}> ${esc(h.nome)}</label>`).join('')}</div>`:`<div class="hint-txt">Cadastre hospitais primeiro na aba Hospitais.</div>`}
+    </div>
+    <div class="modal-foot">
+      ${id?`<button class="btn btn-danger" id="del" style="margin-right:auto">Excluir</button>`:''}
+      <button class="btn" id="mcancel">Cancelar</button>
+      <button class="btn btn-primary" style="width:auto" id="msave">Salvar</button>
+    </div>
+  </div></div>`;
+  const close=()=>$('#modal-root').innerHTML='';
+  $('#ov').onclick=e=>{if(e.target.id==='ov')close();};$('#mx').onclick=close;$('#mcancel').onclick=close;
+  if($('#del'))$('#del').onclick=()=>{
+    if(myCirurgias().some(c=>c.convenioId===id)){ return toast('Há cirurgias com este convênio — não é possível excluir'); }
+    DB.convenios=DB.convenios.filter(c=>c.id!==id); save(); close(); toast('Convênio excluído'); render();
+  };
+  $('#msave').onclick=()=>{
+    const nome=$('#c-nome').value.trim(); if(!nome) return toast('Informe o nome');
+    const ids=$$('.checks input:checked').map(i=>i.value);
+    if(id){ const c=DB.convenios.find(x=>x.id===id); c.nome=nome; c.hospitalIds=ids; }
+    else DB.convenios.push({id:uid('con'),medicoId:M(),nome,hospitalIds:ids});
+    save(); close(); toast('Convênio salvo'); render();
+  };
+}
+
+/* ============================================================
+   VIEW: HOSPITAIS
+   ============================================================ */
+function viewHospitais(){
+  const root=$('#viewRoot');
+  const hs=myHospitais();
+  const convs=myConvenios();
+  const cirById={}; myCirurgias().forEach(c=>cirById[c.id]=c);
+  const allOpen=myProcs().filter(p=>saldoAberto(p)>0).map(p=>{
+    const c=cirById[p.cirurgiaId]||{};
+    return {hospId:c.hospitalId, d:daysSince(c.dataCirurgia), v:saldoAberto(p)};
+  });
+
+  const cardHtml=(h,i)=>{
+    const col=CONV_CARD_COLORS[i%CONV_CARD_COLORS.length];
+    const open=allOpen.filter(x=>x.hospId===h.id);
+    const rec=open.filter(x=>x.d<=90), old=open.filter(x=>x.d>90);
+    const sum=arr=>arr.reduce((s,x)=>s+x.v,0);
+    const ligados=convs.filter(cv=>(cv.hospitalIds||[]).includes(h.id));
+    const tags = ligados.length
+      ? ligados.slice(0,5).map(cv=>`<span class="cc-tag">${esc(cv.nome)}</span>`).join('')
+        + (ligados.length>5?`<span class="cc-tag">+${ligados.length-5}</span>`:'')
+      : `<span class="cc-tag">nenhum convênio vinculado</span>`;
+    const metric=(label,color,n,v)=>`
+      <div class="cc-metric">
+        <div class="mbar" style="background:${color}"></div>
+        <div class="mtxt">
+          <div class="mlabel">${label}</div>
+          <div class="mval"><span class="mn">${n}</span><span class="mv">${money(v)}</span></div>
+        </div>
+      </div>`;
+    return `<div class="conv-card hosp-card" data-ed="${h.id}" style="--cc:${col}">
+      <div class="cc-head">
+        <div class="cc-name">${esc(h.nome)}</div>
+        <div class="cc-sub">${esc(h.rede||'sem rede')}</div>
+        <div class="cc-tags" title="Convênios que atendem neste hospital">${tags}</div>
+      </div>
+      <div class="cc-metrics">
+        ${metric('Procedimentos a receber total','#eab308',open.length,sum(open))}
+        ${metric('Procedimentos a receber 0 a 90 dias','#f59e0b',rec.length,sum(rec))}
+        ${metric('Procedimentos a receber + de 90 dias','#b91c1c',old.length,sum(old))}
+      </div>
+    </div>`;
+  };
+
+  const f=state.filters.hospList=state.filters.hospList||{q:''};
+  const matchQ=(h,q)=>{
+    if(!q) return true;
+    if(h.nome.toLowerCase().includes(q)) return true;
+    if((h.rede||'').toLowerCase().includes(q)) return true;
+    return convs.filter(cv=>(cv.hospitalIds||[]).includes(h.id)).map(cv=>cv.nome).join(' ').toLowerCase().includes(q);
+  };
+
+  root.innerHTML=`
+    <div class="page-head"><div><h1>Hospitais</h1><p>${hs.length} hospital(is) · procedimentos a receber por faixa de tempo desde a cirurgia</p></div>
+      <button class="btn btn-primary" style="width:auto" id="novo">+ Novo hospital</button></div>
+    <div class="toolbar"><input class="search" id="hqs" style="min-width:300px" placeholder="Buscar por hospital ou convênio..." value="${esc(f.q)}"></div>
+    <div id="hospListWrap"></div>`;
+
+  const paint=()=>{
+    const q=f.q.trim().toLowerCase();
+    const list=hs.filter(h=>matchQ(h,q));
+    $('#hospListWrap').innerHTML = list.length
+      ? `<div class="conv-grid">${list.map(h=>cardHtml(h,hs.indexOf(h))).join('')}</div>`
+      : `<div class="card"><div class="card-body">${emptyState(hs.length?'Nenhum hospital corresponde à busca':'Nenhum hospital cadastrado','')}</div></div>`;
+    $$('#hospListWrap [data-ed]').forEach(b=>b.onclick=()=>editHospital(b.dataset.ed));
+  };
+  $('#hqs').oninput=e=>{ f.q=e.target.value; paint(); };
+  $('#novo').onclick=()=>editHospital(null);
+  paint();
+}
+function editHospital(id){
+  const h=id?DB.hospitais.find(x=>x.id===id):{id:null,nome:'',rede:''};
+  const sel=new Set(id ? myConvenios().filter(cv=>(cv.hospitalIds||[]).includes(id)).map(cv=>cv.id) : []);
+
+  $('#modal-root').innerHTML=`
+  <div class="overlay" id="ov"><div class="modal" style="max-width:480px">
+    <div class="modal-head"><h3>${id?'Editar hospital':'Novo hospital'}</h3><button class="x-btn" id="mx">&times;</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Nome do hospital *</label><input id="h-nome" value="${esc(h.nome)}"></div>
+      <div class="field"><label>Rede / grupo</label><input id="h-rede" value="${esc(h.rede||'')}" placeholder="Ex.: Rede Cirúrgica, Unimed..."></div>
+      <div class="field">
+        <label>Convênios que atendem neste hospital</label>
+        <div id="cvChips" style="margin-bottom:6px"></div>
+        <div class="cbhpm-cell">
+          <input id="cvInput" placeholder="Digite para buscar um convênio..." autocomplete="off">
+          <div class="cbhpm-drop" id="cvDrop" style="display:none"></div>
+        </div>
+        <button class="btn btn-sm" id="cvNew" type="button" style="margin-top:8px">+ Novo convênio</button>
+      </div>
+    </div>
+    <div class="modal-foot">
+      ${id?`<button class="btn btn-danger" id="del" style="margin-right:auto">Excluir</button>`:''}
+      <button class="btn" id="mcancel">Cancelar</button>
+      <button class="btn btn-primary" style="width:auto" id="msave">Salvar</button>
+    </div>
+  </div></div>`;
+  const close=()=>$('#modal-root').innerHTML='';
+  $('#ov').onclick=e=>{if(e.target.id==='ov')close();};$('#mx').onclick=close;$('#mcancel').onclick=close;
+
+  const input=$('#cvInput'), drop=$('#cvDrop');
+  const hideDrop=()=>{ drop.style.display='none'; };
+  const paintChips=()=>{
+    const chips=[...sel].map(cid=>{
+      const cv=DB.convenios.find(c=>c.id===cid); if(!cv) return '';
+      return `<span class="chip">${esc(cv.nome)}<button type="button" data-rm="${cid}" style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:15px;line-height:1;padding:0 0 0 3px">&times;</button></span>`;
+    }).join('');
+    $('#cvChips').innerHTML = chips || `<span class="hint-txt">Nenhum convênio vinculado ainda.</span>`;
+    $$('#cvChips [data-rm]').forEach(b=>b.onclick=()=>{ sel.delete(b.dataset.rm); paintChips(); });
+  };
+  const addConv=cid=>{ sel.add(cid); input.value=''; hideDrop(); paintChips(); input.focus(); };
+  const createConv=nome=>{
+    nome=(nome||'').trim(); if(!nome) return toast('Digite o nome do convênio');
+    let cv=myConvenios().find(c=>c.nome.toLowerCase()===nome.toLowerCase());
+    if(!cv){ cv={id:uid('con'),medicoId:M(),nome,hospitalIds:[]}; DB.convenios.push(cv); save(); toast('Convênio “'+nome+'” criado'); }
+    addConv(cv.id);
+  };
+  const showMatches=()=>{
+    const q=input.value.trim().toLowerCase();
+    const list=myConvenios().filter(cv=>!sel.has(cv.id) && (!q || cv.nome.toLowerCase().includes(q)));
+    const exact=myConvenios().some(cv=>cv.nome.toLowerCase()===q);
+    let html=list.slice(0,30).map(cv=>`<div class="cbhpm-opt" data-add="${cv.id}">${esc(cv.nome)}</div>`).join('');
+    if(q && !exact) html+=`<div class="cbhpm-opt" data-create="1"><span class="code">＋</span> Criar convênio “${esc(input.value.trim())}”</div>`;
+    if(!html){ hideDrop(); return; }
+    drop.innerHTML=html; drop.style.display='block';
+    $$('#cvDrop [data-add]').forEach(o=>o.onmousedown=e=>{ e.preventDefault(); addConv(o.dataset.add); });
+    const cr=$('#cvDrop [data-create]');
+    if(cr) cr.onmousedown=e=>{ e.preventDefault(); createConv(input.value); };
+  };
+  input.oninput=showMatches;
+  input.onfocus=showMatches;
+  input.onblur=()=>setTimeout(hideDrop,150);
+  input.onkeydown=e=>{
+    if(e.key==='Enter'){ e.preventDefault();
+      const q=input.value.trim().toLowerCase();
+      const m=myConvenios().find(cv=>cv.nome.toLowerCase()===q && !sel.has(cv.id));
+      if(m) addConv(m.id); else if(q) createConv(input.value);
+    } else if(e.key==='Escape') hideDrop();
+  };
+  $('#cvNew').onclick=()=>{ if(input.value.trim()) createConv(input.value); else input.focus(); };
+  paintChips();
+
+  if($('#del'))$('#del').onclick=()=>{
+    if(myCirurgias().some(c=>c.hospitalId===id)) return toast('Há cirurgias neste hospital — não é possível excluir');
+    DB.hospitais=DB.hospitais.filter(x=>x.id!==id);
+    DB.convenios.forEach(c=>c.hospitalIds=(c.hospitalIds||[]).filter(x=>x!==id));
+    save(); close(); toast('Hospital excluído'); render();
+  };
+  $('#msave').onclick=()=>{
+    const nome=$('#h-nome').value.trim(); if(!nome) return toast('Informe o nome');
+    const rede=$('#h-rede').value.trim();
+    let hid=id;
+    if(id){ const x=DB.hospitais.find(z=>z.id===id); x.nome=nome; x.rede=rede; }
+    else { hid=uid('hos'); DB.hospitais.push({id:hid,medicoId:M(),nome,rede}); }
+    myConvenios().forEach(cv=>{
+      const has=(cv.hospitalIds||[]).includes(hid), want=sel.has(cv.id);
+      if(want && !has) cv.hospitalIds=[...(cv.hospitalIds||[]),hid];
+      else if(!want && has) cv.hospitalIds=cv.hospitalIds.filter(x=>x!==hid);
+    });
+    save(); close(); toast('Hospital salvo'); render();
+  };
+}
+
+/* ============================================================
+   VIEW: VALORES DE REFERÊNCIA (média histórica paga)
+   ============================================================ */
+function viewReferencia(){
+  const root=$('#viewRoot');
+  const f=state.filters.ref=state.filters.ref||{q:''};
+  const m={};
+  myProcs().forEach(p=>{
+    if(!((+p.valorPago||0)>0)) return;
+    const c=cirOf(p.cirurgiaId); if(!c) return;
+    const code=String(p.codigo).replace(/\D/g,'');
+    const papel=c.papel||'—';
+    const porte=p.porte || (CBHPM_BY_CODE[code]||{}).porte || '—';
+    const k=code+'|'+c.convenioId+'|'+papel;
+    const o=m[k]=m[k]||{codigo:p.codigo,nome:p.nome,porte,papel,convenioId:c.convenioId,pagos:[],prev:0,ultima:''};
+    o.pagos.push(+p.valorPago||0); o.prev+=+p.valorPrevisto||0;
+    if((p.dataPagamento||'')>o.ultima) o.ultima=p.dataPagamento||'';
+  });
+  let rows=Object.values(m).map(o=>{
+    const soma=o.pagos.reduce((s,v)=>s+v,0);
+    return {...o, n:o.pagos.length, media:soma/o.pagos.length, min:Math.min(...o.pagos), max:Math.max(...o.pagos), taxa:o.prev?soma/o.prev*100:null};
+  });
+  const q=f.q.trim().toLowerCase();
+  if(q) rows=rows.filter(r=>(fmtCbhpm(r.codigo)+' '+r.nome+' '+convName(r.convenioId)+' '+r.papel+' '+r.porte).toLowerCase().includes(q));
+  rows.sort((a,b)=> convName(a.convenioId).localeCompare(convName(b.convenioId)) || String(a.papel).localeCompare(String(b.papel)) || (b.media-a.media));
+
+  root.innerHTML=`
+    <div class="page-head"><div><h1>Valores de referência</h1><p>Média do que cada convênio efetivamente pagou — por procedimento e <b>papel do médico</b> (cirurgião, auxiliar e anestesista recebem valores distintos). Base da sugestão de valor previsto.</p></div></div>
+    <div class="toolbar"><input class="search" id="refq" style="min-width:340px" placeholder="Buscar procedimento, convênio, papel ou porte..." value="${esc(f.q)}"></div>
+    <div class="card"><div class="card-body flush"><div class="t-wrap">
+    ${rows.length?`<table><thead><tr>
+      <th>Procedimento</th><th style="width:52px">Porte</th><th>Papel</th><th>Convênio</th><th class="num">Pagamentos</th><th class="num">Média paga</th><th class="num">Faixa</th><th class="num">Pago vs. previsto</th><th>Último</th>
+    </tr></thead><tbody>
+      ${rows.map(r=>`<tr>
+        <td><span style="font-variant-numeric:tabular-nums;color:var(--muted)">${fmtCbhpm(r.codigo)}</span><br>${esc(r.nome)}</td>
+        <td style="text-align:center">${esc(r.porte)}</td>
+        <td>${esc(r.papel)}</td>
+        <td>${esc(convName(r.convenioId))}</td>
+        <td class="num">${r.n}</td>
+        <td class="num" style="font-weight:700">${money(r.media)}</td>
+        <td class="num" style="color:var(--muted)">${r.n>1?money0(r.min)+' – '+money0(r.max):'—'}</td>
+        <td class="num" style="color:${r.taxa==null?'var(--muted)':r.taxa>=95?'var(--green)':r.taxa>=85?'var(--amber)':'var(--red)'}">${r.taxa!=null?r.taxa.toFixed(0)+'%':'—'}</td>
+        <td>${fmtDate(r.ultima)}</td>
+      </tr>`).join('')}
+    </tbody></table>`:emptyState('Sem histórico ainda','As médias aparecem conforme você registra pagamentos (baixa) nas cirurgias.')}
+    </div></div></div>`;
+  $('#refq').oninput=e=>{ f.q=e.target.value; clearTimeout(window._reft); window._reft=setTimeout(viewReferencia,180); };
+}
+
+/* ============================================================
+   VIEW: BACKUP E CONFIGURAÇÕES
+   ============================================================ */
+function exportBackup(){
+  try{
+    const blob=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='controldoctor-backup-'+todayISO()+'.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    toast('Backup exportado');
+  }catch(e){ toast('Não foi possível exportar'); }
+}
+function importBackup(file){
+  const rd=new FileReader();
+  rd.onload=()=>{
+    let parsed;
+    try{ parsed=JSON.parse(rd.result); }catch(e){ return toast('Arquivo inválido'); }
+    if(!parsed || !Array.isArray(parsed.cirurgias) || !Array.isArray(parsed.procedimentos)) return toast('Este arquivo não é um backup do ControlDoctor');
+    if(!confirm('Substituir TODOS os dados atuais pelo conteúdo do backup? Recomendado exportar antes.')) return;
+    DB=parsed;
+    (DB.cirurgias||[]).forEach(c=>{ if(c.paciente) c.paciente=acronimoNome(c.paciente); });
+    save(); toast('Backup importado'); state.view='cirurgias'; render();
+  };
+  rd.readAsText(file);
+}
+function apagarTudo(){
+  if(!confirm('Apagar TODOS os dados deste dispositivo? Exporte um backup antes — esta ação não pode ser desfeita.')) return;
+  if((prompt('Digite APAGAR para confirmar:')||'').trim().toUpperCase()!=='APAGAR') return;
+  try{ localStorage.removeItem(LS_DB); localStorage.removeItem(lgpdKey()); localStorage.removeItem(LS_SESSION); }catch(e){}
+  DB=emptyDB(); save();
+  location.reload();
+}
+function viewConfig(){
+  const root=$('#viewRoot');
+  const med=currentMed()||{};
+  const nCir=myCirurgias().length, nProc=myProcs().length;
+  root.innerHTML=`
+    <div class="page-head"><div><h1>Backup e configurações</h1><p>Seus dados ficam apenas neste navegador. Faça backups com frequência.</p></div></div>
+
+    <div class="card"><div class="card-head"><h3>Conta</h3></div><div class="card-body">
+      <div style="font-size:13px;line-height:1.7">
+        <div><b>${esc(med.nome||'—')}</b></div>
+        <div style="color:var(--muted)">${esc(med.email||'')}${med.crm?' · '+esc(med.crm):''}${med.esp?' · '+esc(med.esp):''}</div>
+        <div style="color:var(--muted);margin-top:6px">Autenticação: ${SB_ON?'<span style="color:var(--green)">Supabase (login seguro)</span>':'<span style="color:var(--amber)">modo local de testes</span>'}</div>
+        <div style="color:var(--muted)">${nCir} cirurgia(s) · ${nProc} procedimento(s) neste dispositivo</div>
+      </div>
+      <button class="btn btn-sm" id="cfgLgpd" style="margin-top:12px">Ver responsabilidades / LGPD</button>
+      <button class="btn btn-sm" id="cfgOut" style="margin-top:12px">Sair da conta</button>
+    </div></div>
+
+    <div class="card"><div class="card-head"><h3>Backup dos dados</h3></div><div class="card-body">
+      <p class="hint-txt" style="margin-top:0">Baixe um arquivo com todos os seus dados. Guarde em local seguro. Para trocar de computador, exporte aqui e importe no outro.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" style="width:auto" id="cfgExport">⬇ Exportar backup (.json)</button>
+        <label class="btn" style="width:auto;cursor:pointer">⬆ Importar backup<input type="file" id="cfgImport" accept="application/json,.json" hidden></label>
+      </div>
+    </div></div>
+
+    <div class="card"><div class="card-head"><h3 style="color:var(--red)">Zona de risco</h3></div><div class="card-body">
+      <p class="hint-txt" style="margin-top:0">Remove permanentemente todos os dados deste dispositivo. Exporte um backup antes.</p>
+      <button class="btn btn-danger" style="width:auto" id="cfgWipe">Apagar todos os dados deste dispositivo</button>
+    </div></div>`;
+
+  $('#cfgExport').onclick=exportBackup;
+  $('#cfgImport').onchange=e=>{ if(e.target.files[0]) importBackup(e.target.files[0]); };
+  $('#cfgWipe').onclick=apagarTudo;
+  $('#cfgOut').onclick=logout;
+  $('#cfgLgpd').onclick=()=>{ $('#app').innerHTML=lgpdView(med); bindLgpd(); $('#lg-ok').checked=true; $('#lg-go').disabled=false; };
+}
+
+/* ============================================================
+   VIEW: CBHPM (consulta)
+   ============================================================ */
+function viewCbhpm(){
+  const root=$('#viewRoot');
+  const f=state.filters.cb=state.filters.cb||{q:''};
+  const res=f.q? cbhpmSearch(f.q).slice(0,120):[];
+  root.innerHTML=`
+    <div class="page-head"><div><h1>Tabela CBHPM</h1><p>${CBHPM.length.toLocaleString('pt-BR')} procedimentos de referência (consulta)</p></div></div>
+    <div class="toolbar"><input class="search" id="cbq" style="min-width:340px" placeholder="Buscar por código ou nome do procedimento..." value="${esc(f.q)}"></div>
+    <div class="card"><div class="card-body flush"><div class="t-wrap">
+    ${f.q? (res.length?`<table><thead><tr><th style="width:150px">Código</th><th>Procedimento</th><th style="width:80px">Porte</th></tr></thead><tbody>
+      ${res.map(m=>`<tr><td style="font-variant-numeric:tabular-nums;font-weight:600;color:var(--accent)">${fmtCbhpm(m.codigo)}</td><td>${esc(m.nome)}</td><td>${esc(m.porte)}</td></tr>`).join('')}
+    </tbody></table>${res.length>=120?'<div class="hint-txt" style="padding:10px 14px">Mostrando os primeiros 120 resultados — refine a busca.</div>':''}`
+      : emptyState('Nenhum resultado','Tente outro código ou termo.'))
+      : `<div class="empty">${iconBook()}<div style="margin-top:8px">Digite acima para pesquisar na tabela CBHPM</div></div>`}
+    </div></div></div>`;
+  $('#cbq').oninput=e=>{f.q=e.target.value;clearTimeout(window._cbt);window._cbt=setTimeout(viewCbhpm,180);};
+}
+
+/* ============================================================
+   icons
+   ============================================================ */
+function iconCal(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>`;}
+function iconCheck(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>`;}
+function iconClock(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>`;}
+function iconChart(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="13" y="6" width="3" height="11"/></svg>`;}
+function iconDoc(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>`;}
+function iconHosp(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14"/><path d="M12 9v6M9 12h6"/></svg>`;}
+function iconBook(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`;}
+function iconGear(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;}
+
+/* ---------------- boot ---------------- */
+async function boot(){
+  if(SB_ON && sb){
+    try{
+      const { data } = await sb.auth.getSession();
+      if(data && data.session){ session = { medicoId:data.session.user.id, user:data.session.user, email:data.session.user.email }; }
+    }catch(e){}
+    sb.auth.onAuthStateChange((_evt, s)=>{
+      session = s ? { medicoId:s.user.id, user:s.user, email:s.user.email } : null;
+      if(session) state.view='cirurgias';
+      render();
+    });
+  }
+  render();
+}
+boot();
+</script>
+</body>
+</html>
