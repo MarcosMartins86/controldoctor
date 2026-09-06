@@ -272,9 +272,9 @@ function daysSince(iso){ if(!iso) return 0; return Math.floor((Date.now()-new Da
 function fmtCbhpm(c){ c=String(c||'').replace(/\D/g,''); if(c.length<8) return c; return `${c[0]}.${c.slice(1,3)}.${c.slice(3,5)}.${c.slice(5,7)}-${c.slice(7)}`; }
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200); }
 
-/* LGPD / minimização: nomes de paciente são reduzidos a iniciais antes de gravar.
-   "Maria Jose da Silva Chagas" -> "M.J.S.C."  ·  "PAC-042" ou "João" -> mantidos.
-   Idempotente: reprocessar um valor já reduzido não muda nada. */
+/* acronimoNome: reduz um nome a iniciais. NÃO está sendo aplicado nesta versão
+   (dados ficam só no dispositivo do médico). Mantido para uso futuro, se houver
+   sincronização com servidor. "Maria Jose da Silva Chagas" -> "M.J.S.C.". */
 function acronimoNome(nome){
   const s=String(nome||'').trim();
   if(!s) return '';
@@ -326,8 +326,6 @@ function load(){
   try{ const raw=localStorage.getItem(LS_DB); if(raw) db=JSON.parse(raw); }catch(e){}
   if(!db) db = SB_ON ? emptyDB() : seed();   // com login real, começa vazio (sem dados de exemplo)
   if(!Array.isArray(db.favoritos)) db.favoritos=[];
-  // minimização: garante que nenhum nome completo fique gravado (dados antigos incluídos)
-  (db.cirurgias||[]).forEach(c=>{ if(c.paciente) c.paciente=acronimoNome(c.paciente); });
   return db;
 }
 function save(){ localStorage.setItem(LS_DB, JSON.stringify(DB)); }
@@ -659,13 +657,12 @@ function lgpdView(med){
       <p style="margin:0 0 12px">Você é o <b>responsável (controlador)</b> pelos dados dos seus pacientes registrados nesta ferramenta. Os dados ficam <b>apenas neste dispositivo/navegador</b> — não são enviados para nenhum servidor.</p>
       <p style="margin:0 0 8px;font-weight:650">Ao usar o ControlDoctor, você se compromete a:</p>
       <ul style="margin:0 0 12px;padding-left:20px">
-        <li style="margin:5px 0"><b>Nunca registrar nome completo, CPF, RG, telefone, e-mail ou endereço</b> do paciente. Use apenas iniciais ou um código.</li>
-        <li style="margin:5px 0">Não incluir, no campo <b>Cirurgia / Observações</b> ou em qualquer outro, informações que identifiquem o paciente.</li>
-        <li style="margin:5px 0">O número do prontuário sozinho não identifica o paciente. A ligação entre esse número e o nome real deve ficar <b>apenas no sistema da sua clínica</b> — nunca aqui.</li>
+        <li style="margin:5px 0">Registrar <b>apenas o necessário</b> para o seu controle. Nesta versão os dados não saem do dispositivo, mas evite guardar CPF, RG, telefone e endereço do paciente.</li>
+        <li style="margin:5px 0">Garantir uma <b>base legal</b> para o tratamento dos dados (tutela da saúde / execução de contrato) e informar o paciente quando aplicável.</li>
         <li style="margin:5px 0">Não usar em <b>computador compartilhado</b>; encerrar a sessão ao terminar.</li>
-        <li style="margin:5px 0">Garantir uma <b>base legal</b> para o tratamento (tutela da saúde / execução de contrato) e informar o paciente quando aplicável.</li>
+        <li style="margin:5px 0"><b>Exportar backup</b> com frequência (menu Sistema). Os dados só existem neste navegador.</li>
       </ul>
-      <p style="margin:0;color:var(--muted);font-size:12px">O sistema já reduz nomes a iniciais automaticamente, mas isso não substitui o seu cuidado.</p>
+      <p style="margin:0;color:var(--muted);font-size:12px">Se no futuro os dados forem sincronizados com servidor, esta política será revista.</p>
     </div>
 
     <label style="display:flex;gap:9px;align-items:flex-start;margin:16px 0 12px;font-size:13px;font-weight:500">
@@ -857,9 +854,7 @@ function renderCirModal(){
 
   const tab1 = ()=>`
     <div class="form-grid">
-      <div class="full"><label>Identificação do paciente *</label><input id="d-pac" value="${esc(draft.paciente)}" placeholder="nome, código ou apelido">
-        <div class="hint-txt" id="d-pac-hint">Só as iniciais são gravadas (LGPD). Ex.: “Maria J. da Silva” → <b>M.J.S.</b></div>
-      </div>
+      <div class="full"><label>Paciente *</label><input id="d-pac" value="${esc(draft.paciente)}" placeholder="nome do paciente"></div>
       <div class="full"><label>Nº prontuário</label><input id="d-pront" value="${esc(draft.prontuario||'')}" placeholder="número do prontuário no hospital"></div>
       <div><label>Convênio *</label><select id="d-conv"><option value="">Selecione...</option>${convs.map(c=>`<option value="${c.id}" ${draft.convenioId===c.id?'selected':''}>${esc(c.nome)}</option>`).join('')}</select></div>
       <div><label>Hospital *</label><select id="d-hosp"><option value="">Selecione...</option>${hosps.map(h=>`<option value="${h.id}" ${draft.hospitalId===h.id?'selected':''}>${esc(h.nome)}</option>`).join('')}</select>
@@ -964,12 +959,7 @@ function renderCirModal(){
     }; };
     bind('#d-conv','convenioId'); bind('#d-hosp','hospitalId');
     bind('#d-dsol','dataSolicitacao'); bind('#d-dcir','dataCirurgia'); bind('#d-car','carater'); bind('#d-papel','papel');
-    $('#d-pac').oninput=e=>{ draft.paciente=e.target.value;
-      const a=acronimoNome(e.target.value), h=$('#d-pac-hint');
-      if(h) h.innerHTML = (a && a!==e.target.value.trim())
-        ? `Será gravado como <b>${esc(a)}</b>`
-        : 'Só as iniciais são gravadas (LGPD). Ex.: “Maria J. da Silva” → <b>M.J.S.</b>';
-    };
+    $('#d-pac').oninput=e=>draft.paciente=e.target.value;
     $('#d-obs').oninput=e=>draft.obs=e.target.value;
     $('#d-pront').oninput=e=>draft.prontuario=e.target.value;
   } else if(tab===2){
@@ -1175,7 +1165,6 @@ function ocrExtractMock(files){
   if(hit){
     r._fonte.engine = 'amostra';
     Object.assign(r, JSON.parse(JSON.stringify(hit.dados)));
-    r.paciente = acronimoNome(r.paciente);   // minimização já na leitura
     r.procedimentos = (r.procedimentos||[]).map(p=>({codigo:p.codigo,nome:'',qtd:p.qtd||1,statusPlano:'Aguarda Aprovação',statusAuditoria:'Aguarda Auditoria',valorPrevisto:0,valorPago:0,dataPagamento:''}));
     if(!r.procedimentos.length) r.procedimentos=[{codigo:'',nome:'',qtd:1,statusPlano:'Aguarda Aprovação',statusAuditoria:'Aguarda Auditoria',valorPrevisto:0,valorPago:0,dataPagamento:''}];
     return r;
@@ -1238,7 +1227,7 @@ function ocrReviewHtml(r){
       : '⚠ Sem leitor de OCR plugado para este arquivo: os campos abaixo <b>não</b> foram lidos. Preencha manualmente ou use um dos documentos de exemplo.'}
   </div>
   <div class="form-grid">
-    <div><label>Identificação do paciente</label><input id="o-pac" value="${esc(r.paciente)}"><div class="hint-txt">gravado só com iniciais</div></div>
+    <div><label>Paciente</label><input id="o-pac" value="${esc(r.paciente)}"></div>
     <div><label>Nº prontuário</label><input id="o-pront" value="${esc(r.prontuario||'')}"></div>
     <div><label>Convênio (nome)</label><input id="o-conv" value="${esc(r.convenio)}" placeholder="ex.: Amil"></div>
     <div><label>Hospital (nome)</label><input id="o-hosp" value="${esc(r.hospital)}" placeholder="ex.: Memorial Star"></div>
@@ -1267,7 +1256,7 @@ function ocrProcRow(p,i){
 }
 function ocrCollectReview(r){
   const g = id => { const el=$('#'+id); return el?el.value:''; };
-  r.paciente=acronimoNome(g('o-pac')); r.prontuario=g('o-pront'); r.convenio=g('o-conv'); r.hospital=g('o-hosp');
+  r.paciente=g('o-pac'); r.prontuario=g('o-pront'); r.convenio=g('o-conv'); r.hospital=g('o-hosp');
   r.dataSolicitacao=g('o-dsol'); r.dataCirurgia=g('o-dcir'); r.carater=g('o-car');
   r.procedimentos = $$('#o-procs tr').map(tr=>{
     const f = n => { const el=tr.querySelector(`[data-of="${n}"]`); return el?el.value:''; };
@@ -1424,9 +1413,8 @@ function aplicarConciliacao(r){
 function saveCirurgia(){
   syncCirDraft();
   const d=draft;
-  d.paciente = acronimoNome(d.paciente);   // minimização: só iniciais são gravadas
   const fail=(tab,msg)=>{ d._tab=tab; renderCirModal(); toast(msg); };
-  if(!(d.paciente||'').trim()) return fail(1,'Informe a identificação do paciente');
+  if(!(d.paciente||'').trim()) return fail(1,'Informe o paciente');
   if(!d.convenioId) return fail(1,'Selecione o convênio');
   if(!d.hospitalId) return fail(1,'Selecione o hospital');
   if(!d.dataCirurgia) return fail(1,'Informe a data da cirurgia');
@@ -2377,7 +2365,6 @@ function importBackup(file){
     if(!parsed || !Array.isArray(parsed.cirurgias) || !Array.isArray(parsed.procedimentos)) return toast('Este arquivo não é um backup do ControlDoctor');
     if(!confirm('Substituir TODOS os dados atuais pelo conteúdo do backup? Recomendado exportar antes.')) return;
     DB=parsed;
-    (DB.cirurgias||[]).forEach(c=>{ if(c.paciente) c.paciente=acronimoNome(c.paciente); });
     save(); toast('Backup importado'); state.view='cirurgias'; render();
   };
   rd.readAsText(file);
