@@ -2202,7 +2202,11 @@ function viewReferencia(){
     return {...o, n:o.pagos.length, media:soma/o.pagos.length, min:Math.min(...o.pagos), max:Math.max(...o.pagos), taxa:o.prev?soma/o.prev*100:null};
   });
   const q=f.q.trim().toLowerCase();
-  if(q) rows=rows.filter(r=>(fmtCbhpm(r.codigo)+' '+r.nome+' '+convName(r.convenioId)+' '+r.papel).toLowerCase().includes(q));
+  const qd=q.replace(/\D/g,'');   // busca por código aceita só números (com ou sem pontos/traços)
+  if(q) rows=rows.filter(r=>{
+    const hay=(fmtCbhpm(r.codigo)+' '+r.nome+' '+convName(r.convenioId)+' '+r.papel).toLowerCase();
+    return hay.includes(q) || (qd && String(r.codigo).replace(/\D/g,'').includes(qd));
+  });
   rows.sort((a,b)=> convName(a.convenioId).localeCompare(convName(b.convenioId)) || String(a.papel).localeCompare(String(b.papel)) || (b.media-a.media));
 
   root.innerHTML=`
