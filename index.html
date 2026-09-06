@@ -285,38 +285,47 @@ function acronimoNome(nome){
   return signif.map(w=>w[0].toUpperCase()).join('.')+'.';
 }
 
-/* ---------------- CBHPM reference ---------------- */
-const CBHPM = (window.CBHPM_DATA||[]).map(x=>({codigo:x.c, nome:x.d, porte:x.p}));
+/* ---------------- CBHPM reference (multi-edição: só código + descrição por edição) ---------------- */
+const CBHPM_EDICOES = ['2018','2016','2012'];   // mais recente primeiro
+const CBHPM = (window.CBHPM_DATA||[]).map(x=>({ codigo:x.c, nome:x.d, edicoes:(x.y||x.edicoes||['2018']) }));
 const CBHPM_BY_CODE = Object.fromEntries(CBHPM.map(x=>[x.codigo,x]));
-function cbhpmSearch(q){
+function cbExistsIn(x, ed){ return !!x && (x.edicoes||[]).includes(ed); }
+function cbhpmSearch(q, ed){
   q=(q||'').trim().toLowerCase();
   if(!q) return [];
   const digits=q.replace(/\D/g,'');
+  const wrap = x => ({ codigo:x.codigo, nome:x.nome, edicoes:x.edicoes });
+  const okEd = x => !ed || cbExistsIn(x, ed);
+  let res;
   if(digits && !/[a-zà-ú]/.test(q)){            // busca só por código: prefixo primeiro
     const pre=[], mid=[];
     for(const p of CBHPM){
+      if(!okEd(p)) continue;
       if(p.codigo.startsWith(digits)) pre.push(p);
       else if(p.codigo.includes(digits)) mid.push(p);
       if(pre.length>=40) break;
     }
-    return pre.concat(mid).slice(0,40);
-  }
-  const out=[];
-  for(const p of CBHPM){
-    if((digits && p.codigo.includes(digits)) || (q.length>=3 && p.nome.toLowerCase().includes(q))){
-      out.push(p); if(out.length>=40) break;
+    res = pre.concat(mid).slice(0,40);
+  } else {
+    res=[];
+    for(const p of CBHPM){
+      if(!okEd(p)) continue;
+      if((digits && p.codigo.includes(digits)) || (q.length>=3 && p.nome.toLowerCase().includes(q))){
+        res.push(p); if(res.length>=40) break;
+      }
     }
   }
-  return out;
+  return res.map(wrap);
 }
 
 /* ---------------- storage ---------------- */
 let DB = load();
-function emptyDB(){ return { seq:0, medicos:[], convenios:[], hospitais:[], cirurgias:[], procedimentos:[] }; }
+function emptyDB(){ return { seq:0, medicos:[], convenios:[], hospitais:[], cirurgias:[], procedimentos:[], favoritos:[] }; }
 function load(){
   let db;
   try{ const raw=localStorage.getItem(LS_DB); if(raw) db=JSON.parse(raw); }catch(e){}
   if(!db) db = SB_ON ? emptyDB() : seed();   // com login real, começa vazio (sem dados de exemplo)
+  if(!Array.isArray(db.favoritos)) db.favoritos=[];
   // minimização: garante que nenhum nome completo fique gravado (dados antigos incluídos)
   (db.cirurgias||[]).forEach(c=>{ if(c.paciente) c.paciente=acronimoNome(c.paciente); });
   return db;
@@ -355,7 +364,7 @@ function seed(){
     procs.forEach(p=>{
       const ref=CBHPM_BY_CODE[p.codigo]||{};
       db.procedimentos.push(Object.assign({
-        id:mkId('prc'), cirurgiaId:id, codigo:p.codigo, nome:ref.nome||p.nome||'', porte:ref.porte||'',
+        id:mkId('prc'), cirurgiaId:id, codigo:p.codigo, nome:ref.nome||p.nome||'', porte:'',
         qtd:p.qtd||1, statusPlano:p.statusPlano||'Aguarda Aprovação', statusAuditoria:p.statusAuditoria||'Aguarda Auditoria',
         motivoRecusa:p.motivoRecusa||'',
         valorPrevisto:p.valorPrevisto||0, valorPago:p.valorPago||0, dataPagamento:p.dataPagamento||''
@@ -420,7 +429,9 @@ const myHospitais = () => DB.hospitais.filter(h=>h.medicoId===M());
 const myCirurgias = () => DB.cirurgias.filter(c=>c.medicoId===M());
 const procsOf = cirId => DB.procedimentos.filter(p=>p.cirurgiaId===cirId);
 const myProcs = () => { const ids=new Set(myCirurgias().map(c=>c.id)); return DB.procedimentos.filter(p=>ids.has(p.cirurgiaId)); };
+const myFavoritos = () => (DB.favoritos||[]).filter(f=>f.medicoId===M());
 const convName = id => (DB.convenios.find(c=>c.id===id)||{}).nome || '—';
+const convEdicao = id => (DB.convenios.find(c=>c.id===id)||{}).edicaoCbhpm || '2018';
 const hospName = id => (DB.hospitais.find(h=>h.id===id)||{}).nome || '—';
 const cirOf = id => DB.cirurgias.find(c=>c.id===id);
 
@@ -503,6 +514,7 @@ const NAV = [
     {id:'resumo', label:'Resumo', icon:iconChart},
   ]},
   {group:'Cadastros', items:[
+    {id:'favoritos', label:'Favoritos', icon:iconStar},
     {id:'convenios', label:'Convênios', icon:iconDoc},
     {id:'hospitais', label:'Hospitais', icon:iconHosp},
     {id:'referencia', label:'Valores de referência', icon:iconChart},
@@ -540,7 +552,7 @@ function render(){
           <button class="btn btn-ghost btn-sm" id="menuBtn" style="display:none">☰</button>
           <div style="font-weight:650">${navTitle()}</div>
           <div class="who">
-            <span>${esc(med.crm||'')}</span>
+            <span title="${esc(med.crm||'')}">${esc(med.nome||'')}</span>
             <div class="avatar" title="${esc(med.nome)}">${initials(med.nome)}</div>
             <button class="btn btn-ghost btn-sm" id="logoutBtn">Sair</button>
           </div>
@@ -551,7 +563,7 @@ function render(){
   $$('[data-nav]').forEach(b=>b.onclick=()=>go(b.dataset.nav));
   $('#logoutBtn').onclick=logout;
   if($('#lgpdLink')) $('#lgpdLink').onclick=()=>{ $('#app').innerHTML=lgpdView(med); bindLgpd(); $('#lg-ok').checked=true; $('#lg-go').disabled=false; };
-  const views={cirurgias:viewCirurgias,pagamentos:viewPagamentos,recebiveis:viewRecebiveis,resumo:viewResumo,convenios:viewConvenios,hospitais:viewHospitais,referencia:viewReferencia,cbhpm:viewCbhpm,config:viewConfig};
+  const views={cirurgias:viewCirurgias,pagamentos:viewPagamentos,recebiveis:viewRecebiveis,resumo:viewResumo,favoritos:viewFavoritos,convenios:viewConvenios,hospitais:viewHospitais,referencia:viewReferencia,cbhpm:viewCbhpm,config:viewConfig};
   (views[state.view]||viewCirurgias)();
 }
 function navTitle(){ for(const g of NAV) for(const it of g.items) if(it.id===state.view) return it.label; return ''; }
@@ -861,14 +873,17 @@ function renderCirModal(){
     </div>`;
 
   const tab2 = ()=>`
-    <div class="hint-txt" style="margin-bottom:8px">Um procedimento CBHPM por linha. Os valores e pagamentos ficam na guia “Valores e pagamento”.</div>
+    <div class="hint-txt" style="margin-bottom:8px">Um procedimento CBHPM por linha · códigos da <b>CBHPM ${convEdicao(draft.convenioId)}</b>${draft.convenioId?' (edição de '+esc(convName(draft.convenioId))+')':''}. Valores e pagamentos ficam na guia “Valores e pagamento”.</div>
     <div class="t-wrap"><table class="proc-table"><thead><tr>
-      <th style="width:260px">Código / procedimento</th><th style="width:48px">Porte</th><th style="width:48px">Qtd</th>
+      <th style="width:300px">Código / procedimento</th><th style="width:48px">Qtd</th>
       <th style="width:140px">Status plano</th><th style="width:140px">Status auditoria</th><th style="width:200px">Motivo da recusa</th><th style="width:34px"></th>
     </tr></thead><tbody id="procRows">
       ${draft.procs.map((p,i)=>procRowHtml(p,i)).join('')}
     </tbody></table></div>
-    <button class="btn btn-sm" id="addProc" style="margin-top:10px">+ Adicionar procedimento</button>`;
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button class="btn btn-sm" id="addProc">+ Adicionar procedimento</button>
+      ${myFavoritos().some(p=>(p.codigos||[]).length) ? '<button class="btn btn-sm" id="favProc">★ Adicionar dos favoritos</button>' : ''}
+    </div>`;
 
   const tab3 = ()=>{
     const real = draft.procs.filter(p=>p.codigo);
@@ -959,6 +974,7 @@ function renderCirModal(){
     $('#d-pront').oninput=e=>draft.prontuario=e.target.value;
   } else if(tab===2){
     $('#addProc').onclick=()=>{ syncCirDraft(); draft.procs.push(blankProc()); renderCirModal(); };
+    if($('#favProc')) $('#favProc').onclick=openFavPicker;
     bindProcRows();
   } else if(tab===3){
     $$('#valRows [data-f]').forEach(el=>{ el.onchange=()=>{
@@ -1004,7 +1020,6 @@ function procRowHtml(p,i){
     <td class="cbhpm-cell">
       <input class="cb-input" data-f="codigo" placeholder="código (só números) ou nome do procedimento" value="${esc(p.codigo? fmtCbhpm(p.codigo)+' — '+p.nome : '')}" autocomplete="off" inputmode="text">
     </td>
-    <td style="text-align:center">${esc(p.porte||'—')}</td>
     <td><input data-f="qtd" type="number" min="1" step="1" inputmode="numeric" value="${p.qtd||1}"></td>
     <td><select data-f="statusPlano">${['Aguarda Aprovação','Aprovado','Recusado'].map(x=>`<option ${p.statusPlano===x?'selected':''}>${x}</option>`).join('')}</select></td>
     <td><select data-f="statusAuditoria" data-rerender="1">${['Aguarda Auditoria','Aprovado','Recusado','—'].map(x=>`<option ${p.statusAuditoria===x?'selected':''}>${x}</option>`).join('')}</select></td>
@@ -1032,6 +1047,7 @@ function cbHideDrop(){ if(_cbDrop) _cbDrop.style.display='none'; }
 
 function bindProcRows(){
   cbHideDrop();
+  const cbEd = convEdicao(draft.convenioId);   // edição CBHPM do convênio desta cirurgia
   $$('#procRows tr').forEach(tr=>{
     const i=+tr.dataset.pi;
     tr.querySelectorAll('[data-f]:not(.cb-input)').forEach(el=>{
@@ -1050,16 +1066,16 @@ function bindProcRows(){
       d.style.left=r.left+'px'; d.style.top=(r.bottom+2)+'px'; d.style.width=Math.max(r.width,260)+'px';
     };
     const show=()=>{
-      matches=cbhpmSearch(inp.value);
+      matches=cbhpmSearch(inp.value, cbEd);
       const d=cbDropEl();
       if(!matches.length){ d.style.display='none'; return; }
-      d.innerHTML=matches.map((m,k)=>`<div class="cbhpm-opt ${k===hi?'hi':''}" data-k="${k}"><span class="code">${fmtCbhpm(m.codigo)}</span> — ${esc(m.nome)} <span style="color:var(--muted)">(${m.porte})</span></div>`).join('');
+      d.innerHTML=matches.map((m,k)=>`<div class="cbhpm-opt ${k===hi?'hi':''}" data-k="${k}"><span class="code">${fmtCbhpm(m.codigo)}</span> — ${esc(m.nome)} <span class="hint-txt">${(m.edicoes||[]).join("/")}</span></div>`).join('');
       d.querySelectorAll('.cbhpm-opt').forEach(o=>o.onmousedown=e=>{ e.preventDefault(); pick(+o.dataset.k); });
       place(); d.style.display='block';
     };
     const setCode=(m)=>{
       const p=draft.procs[i];
-      p.codigo=m.codigo; p.nome=m.nome; p.porte=m.porte;
+      p.codigo=m.codigo; p.nome=m.nome; p.porte='';
       const mh=mediaPagaHistorica(p.codigo, draft.convenioId, draft.papel, p.id);
       if(mh && ((+p.valorPrevisto||0)===0 || p._autoPrev)){ p.valorPrevisto=mh.media; p._autoPrev=true; }
     };
@@ -1068,9 +1084,10 @@ function bindProcRows(){
     const resolveTyped=()=>{
       const digits=inp.value.replace(/\D/g,'');
       if(digits.length<8) return false;
-      const m=CBHPM_BY_CODE[digits.slice(0,8)] || CBHPM.find(x=>x.codigo===digits.slice(0,8));
-      if(m){ setCode(m); return true; }
-      return false;
+      const m=CBHPM_BY_CODE[digits.slice(0,8)];
+      if(!m) return false;
+      if(!cbExistsIn(m, cbEd)) toast('Código '+fmtCbhpm(m.codigo)+' não consta na CBHPM '+cbEd+' (edição do convênio)');
+      setCode(m); return true;
     };
     inp.oninput=()=>{ hi=-1; show(); };
     inp.onfocus=show;
@@ -1281,7 +1298,7 @@ function aplicarOcr(r){
   const rows = (r.procedimentos||[]).map(p=>{
     const code = String(p.codigo||'').replace(/\D/g,'');
     const ref = CBHPM_BY_CODE[code] || {};
-    return { id:null, codigo:ref.codigo||code||'', nome:ref.nome||p.nome||'', porte:ref.porte||'',
+    return { id:null, codigo:ref.codigo||code||'', nome:ref.nome||p.nome||'', porte:'',
       qtd:+p.qtd||1, statusPlano:p.statusPlano||'Aguarda Aprovação', statusAuditoria:p.statusAuditoria||'Aguarda Auditoria',
       valorPrevisto:+p.valorPrevisto||0, valorPago:+p.valorPago||0, dataPagamento:p.dataPagamento||'' };
   }).filter(p=>p.codigo);
@@ -1919,7 +1936,7 @@ function viewConvenios(){
     return `<div class="conv-card" data-ed="${cv.id}" style="--cc:${col}">
       <div class="cc-head">
         <div class="cc-name">${esc(cv.nome)}</div>
-        <div class="cc-sub">${nHosp} ${nHosp===1?'hospital':'hospitais'}</div>
+        <div class="cc-sub">${nHosp} ${nHosp===1?'hospital':'hospitais'} · CBHPM ${cv.edicaoCbhpm||'2018'}</div>
         <div class="cc-edit">✎ Editar</div>
       </div>
       <div class="cc-metrics">
@@ -1964,6 +1981,10 @@ function editConvenio(id){
     <div class="modal-head"><h3>${id?'Editar convênio':'Novo convênio'}</h3><button class="x-btn" id="mx">&times;</button></div>
     <div class="modal-body">
       <div class="field"><label>Nome do convênio *</label><input id="c-nome" value="${esc(cv.nome)}"></div>
+      <div class="field"><label>Edição da tabela CBHPM usada por este convênio</label>
+        <select id="c-ed">${CBHPM_EDICOES.map(y=>`<option value="${y}" ${(cv.edicaoCbhpm||'2018')===y?'selected':''}>CBHPM ${y}</option>`).join('')}</select>
+        <div class="hint-txt">Define quais códigos aparecem ao lançar procedimentos nas cirurgias deste convênio.</div>
+      </div>
       <label style="font-size:12px;font-weight:600;color:var(--muted);margin:6px 0 6px;display:block">Hospitais atendidos por este convênio</label>
       ${hs.length?`<div class="checks">${hs.map(h=>`<label><input type="checkbox" value="${h.id}" ${sel.has(h.id)?'checked':''}> ${esc(h.nome)}</label>`).join('')}</div>`:`<div class="hint-txt">Cadastre hospitais primeiro na aba Hospitais.</div>`}
     </div>
@@ -1982,8 +2003,9 @@ function editConvenio(id){
   $('#msave').onclick=()=>{
     const nome=$('#c-nome').value.trim(); if(!nome) return toast('Informe o nome');
     const ids=$$('.checks input:checked').map(i=>i.value);
-    if(id){ const c=DB.convenios.find(x=>x.id===id); c.nome=nome; c.hospitalIds=ids; }
-    else DB.convenios.push({id:uid('con'),medicoId:M(),nome,hospitalIds:ids});
+    const ed=$('#c-ed').value;
+    if(id){ const c=DB.convenios.find(x=>x.id===id); c.nome=nome; c.hospitalIds=ids; c.edicaoCbhpm=ed; }
+    else DB.convenios.push({id:uid('con'),medicoId:M(),nome,hospitalIds:ids,edicaoCbhpm:ed});
     save(); close(); toast('Convênio salvo'); render();
   };
 }
@@ -2163,9 +2185,8 @@ function viewReferencia(){
     const c=cirOf(p.cirurgiaId); if(!c) return;
     const code=String(p.codigo).replace(/\D/g,'');
     const papel=c.papel||'—';
-    const porte=p.porte || (CBHPM_BY_CODE[code]||{}).porte || '—';
     const k=code+'|'+c.convenioId+'|'+papel;
-    const o=m[k]=m[k]||{codigo:p.codigo,nome:p.nome,porte,papel,convenioId:c.convenioId,pagos:[],prev:0,ultima:''};
+    const o=m[k]=m[k]||{codigo:p.codigo,nome:p.nome,papel,convenioId:c.convenioId,pagos:[],prev:0,ultima:''};
     o.pagos.push(+p.valorPago||0); o.prev+=+p.valorPrevisto||0;
     if((p.dataPagamento||'')>o.ultima) o.ultima=p.dataPagamento||'';
   });
@@ -2174,19 +2195,18 @@ function viewReferencia(){
     return {...o, n:o.pagos.length, media:soma/o.pagos.length, min:Math.min(...o.pagos), max:Math.max(...o.pagos), taxa:o.prev?soma/o.prev*100:null};
   });
   const q=f.q.trim().toLowerCase();
-  if(q) rows=rows.filter(r=>(fmtCbhpm(r.codigo)+' '+r.nome+' '+convName(r.convenioId)+' '+r.papel+' '+r.porte).toLowerCase().includes(q));
+  if(q) rows=rows.filter(r=>(fmtCbhpm(r.codigo)+' '+r.nome+' '+convName(r.convenioId)+' '+r.papel).toLowerCase().includes(q));
   rows.sort((a,b)=> convName(a.convenioId).localeCompare(convName(b.convenioId)) || String(a.papel).localeCompare(String(b.papel)) || (b.media-a.media));
 
   root.innerHTML=`
     <div class="page-head"><div><h1>Valores de referência</h1><p>Média do que cada convênio efetivamente pagou — por procedimento e <b>papel do médico</b> (cirurgião, auxiliar e anestesista recebem valores distintos). Base da sugestão de valor previsto.</p></div></div>
-    <div class="toolbar"><input class="search" id="refq" style="min-width:340px" placeholder="Buscar procedimento, convênio, papel ou porte..." value="${esc(f.q)}"></div>
+    <div class="toolbar"><input class="search" id="refq" style="min-width:340px" placeholder="Buscar procedimento, convênio ou papel..." value="${esc(f.q)}"></div>
     <div class="card"><div class="card-body flush"><div class="t-wrap">
     ${rows.length?`<table><thead><tr>
-      <th>Procedimento</th><th style="width:52px">Porte</th><th>Papel</th><th>Convênio</th><th class="num">Pagamentos</th><th class="num">Média paga</th><th class="num">Faixa</th><th class="num">Pago vs. previsto</th><th>Último</th>
+      <th>Procedimento</th><th>Papel</th><th>Convênio</th><th class="num">Pagamentos</th><th class="num">Média paga</th><th class="num">Faixa</th><th class="num">Pago vs. previsto</th><th>Último</th>
     </tr></thead><tbody>
       ${rows.map(r=>`<tr>
         <td><span style="font-variant-numeric:tabular-nums;color:var(--muted)">${fmtCbhpm(r.codigo)}</span><br>${esc(r.nome)}</td>
-        <td style="text-align:center">${esc(r.porte)}</td>
         <td>${esc(r.papel)}</td>
         <td>${esc(convName(r.convenioId))}</td>
         <td class="num">${r.n}</td>
@@ -2198,6 +2218,141 @@ function viewReferencia(){
     </tbody></table>`:emptyState('Sem histórico ainda','As médias aparecem conforme você registra pagamentos (baixa) nas cirurgias.')}
     </div></div></div>`;
   $('#refq').oninput=e=>{ f.q=e.target.value; clearTimeout(window._reft); window._reft=setTimeout(viewReferencia,180); };
+}
+
+/* ============================================================
+   VIEW: FAVORITOS — pastas com códigos de procedimento
+   ============================================================ */
+/* autocomplete CBHPM genérico usando o dropdown fixo compartilhado */
+function wireCbhpmInput(inp, onPick){
+  let hi=-1, matches=[];
+  const place=()=>{ const d=cbDropEl(), r=inp.getBoundingClientRect();
+    d.style.left=r.left+'px'; d.style.top=(r.bottom+2)+'px'; d.style.width=Math.max(r.width,260)+'px'; };
+  const show=()=>{
+    matches=cbhpmSearch(inp.value); const d=cbDropEl();
+    if(!matches.length){ d.style.display='none'; return; }
+    d.innerHTML=matches.map((m,k)=>`<div class="cbhpm-opt ${k===hi?'hi':''}" data-k="${k}"><span class="code">${fmtCbhpm(m.codigo)}</span> — ${esc(m.nome)} <span class="hint-txt">${(m.edicoes||[]).join("/")}</span></div>`).join('');
+    d.querySelectorAll('.cbhpm-opt').forEach(o=>o.onmousedown=e=>{ e.preventDefault(); choose(+o.dataset.k); });
+    place(); d.style.display='block';
+  };
+  const choose=k=>{ const m=matches[k]; if(!m) return; cbHideDrop(); inp.value=''; hi=-1; onPick(m); };
+  inp.oninput=()=>{ hi=-1; show(); };
+  inp.onfocus=show;
+  inp.onblur=()=>setTimeout(cbHideDrop,180);
+  inp.onkeydown=e=>{
+    if(e.key==='Enter'){ e.preventDefault();
+      if(hi>=0&&matches[hi]) return choose(hi);
+      if(matches.length===1) return choose(0);
+      const d=inp.value.replace(/\D/g,'');
+      if(d.length>=8 && CBHPM_BY_CODE[d.slice(0,8)]){ cbHideDrop(); inp.value=''; onPick(CBHPM_BY_CODE[d.slice(0,8)]); }
+      return;
+    }
+    if(!_cbDrop || _cbDrop.style.display==='none') return;
+    if(e.key==='ArrowDown'){ hi=Math.min(hi+1,matches.length-1); show(); e.preventDefault(); }
+    else if(e.key==='ArrowUp'){ hi=Math.max(hi-1,0); show(); e.preventDefault(); }
+    else if(e.key==='Escape') cbHideDrop();
+  };
+}
+
+function viewFavoritos(){
+  const root=$('#viewRoot');
+  root.innerHTML=`
+    <div class="page-head">
+      <div><h1>Favoritos</h1><p>Pastas com os códigos de procedimento que você mais usa — para lançar rápido nas cirurgias</p></div>
+      <button class="btn btn-primary" style="width:auto" id="novaPasta">+ Nova pasta</button>
+    </div>
+    <div id="favWrap"></div>`;
+
+  const paint=()=>{
+    const list=myFavoritos();
+    $('#favWrap').innerHTML = list.length ? list.map(pastaCard).join('')
+      : `<div class="card"><div class="card-body">${emptyState('Nenhuma pasta ainda','Crie uma pasta (ex.: "Pé", "Joelho") e adicione os procedimentos que você mais faz.')}</div></div>`;
+    wireCards();
+  };
+
+  const pastaCard=(p)=>`
+    <div class="card">
+      <div class="card-head">
+        <h3>${esc(p.nome)} <span class="hint-txt">· ${(p.codigos||[]).length} procedimento(s)</span></h3>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-ghost" data-ren="${p.id}">Renomear</button>
+          <button class="btn btn-sm btn-danger" data-delp="${p.id}">Excluir</button>
+        </div>
+      </div>
+      <div class="card-body">
+        ${(p.codigos||[]).length ? `<div class="t-wrap"><table class="tbl-compact"><thead><tr><th style="width:140px">Código</th><th>Procedimento</th><th style="width:110px">Edições</th><th style="width:32px"></th></tr></thead><tbody>
+          ${(p.codigos||[]).map(c=>{ const r=CBHPM_BY_CODE[c]||{}; return `<tr>
+            <td style="font-variant-numeric:tabular-nums">${fmtCbhpm(c)}</td>
+            <td>${esc(r.nome||'(código não encontrado)')}</td>
+            <td class="hint-txt">${(r.edicoes||[]).join(', ')}</td>
+            <td><button class="x-btn" data-rmcod="${p.id}::${c}" title="Remover">&times;</button></td>
+          </tr>`; }).join('')}
+        </tbody></table></div>` : '<div class="hint-txt" style="padding:4px 2px 8px">Nenhum procedimento nesta pasta.</div>'}
+        <input class="fav-add" data-pasta="${p.id}" placeholder="+ adicionar: código ou nome do procedimento" autocomplete="off" style="max-width:440px;margin-top:8px">
+      </div>
+    </div>`;
+
+  const wireCards=()=>{
+    $$('#favWrap [data-ren]').forEach(b=>b.onclick=()=>{
+      const p=(DB.favoritos||[]).find(x=>x.id===b.dataset.ren); if(!p) return;
+      const nome=(prompt('Novo nome da pasta:', p.nome)||'').trim(); if(nome){ p.nome=nome; save(); paint(); }
+    });
+    $$('#favWrap [data-delp]').forEach(b=>b.onclick=()=>{
+      if(!confirm('Excluir esta pasta e seus favoritos?')) return;
+      DB.favoritos=(DB.favoritos||[]).filter(x=>x.id!==b.dataset.delp); save(); paint();
+    });
+    $$('#favWrap [data-rmcod]').forEach(b=>b.onclick=()=>{
+      const [pid,cod]=b.dataset.rmcod.split('::');
+      const p=(DB.favoritos||[]).find(x=>x.id===pid); if(!p) return;
+      p.codigos=(p.codigos||[]).filter(c=>c!==cod); save(); paint();
+    });
+    $$('#favWrap .fav-add').forEach(inp=>wireCbhpmInput(inp,(m)=>{
+      const p=(DB.favoritos||[]).find(x=>x.id===inp.dataset.pasta); if(!p) return;
+      p.codigos=p.codigos||[];
+      if(p.codigos.includes(m.codigo)){ toast('Já está na pasta'); return; }
+      p.codigos.push(m.codigo); save(); paint(); toast('Adicionado: '+fmtCbhpm(m.codigo));
+    }));
+  };
+
+  $('#novaPasta').onclick=()=>{
+    const nome=(prompt('Nome da pasta (ex.: Pé, Joelho, Coluna):')||'').trim(); if(!nome) return;
+    DB.favoritos=DB.favoritos||[];
+    DB.favoritos.push({ id:uid('fav'), medicoId:M(), nome, codigos:[] });
+    save(); paint();
+  };
+  paint();
+}
+
+/* seletor de favoritos dentro do modal de cirurgia (guia 2) */
+function openFavPicker(){
+  const favs=myFavoritos().filter(p=>(p.codigos||[]).length);
+  if(!favs.length){ toast('Você não tem favoritos — cadastre em "Favoritos"'); return; }
+  syncCirDraft();
+  $('#modal-root').insertAdjacentHTML('beforeend',`
+  <div class="overlay" id="fpOv" style="z-index:140"><div class="modal" style="max-width:540px">
+    <div class="modal-head"><h3>Adicionar dos favoritos</h3><button class="x-btn" id="fpX">&times;</button></div>
+    <div class="modal-body">
+      ${favs.map(p=>`<h4 style="font-size:12.5px;margin:14px 0 6px">${esc(p.nome)}</h4>
+        <div style="display:flex;flex-direction:column;gap:5px">
+        ${p.codigos.map(c=>{ const r=CBHPM_BY_CODE[c]||{}; return `<button class="btn btn-sm" style="justify-content:flex-start;text-align:left;width:100%" data-add="${c}"><span style="font-variant-numeric:tabular-nums;color:var(--muted);min-width:96px;display:inline-block">${fmtCbhpm(c)}</span> ${esc(r.nome||c)}</button>`; }).join('')}
+        </div>`).join('')}
+    </div>
+    <div class="modal-foot"><button class="btn btn-primary" style="width:auto" id="fpClose">Concluir</button></div>
+  </div></div>`);
+  const ov=$('#fpOv'), done=()=>{ ov.remove(); renderCirModal(); };
+  $('#fpX').onclick=done; $('#fpClose').onclick=done;
+  ov.onclick=e=>{ if(e.target.id==='fpOv') done(); };
+  $$('#fpOv [data-add]').forEach(b=>b.onclick=()=>{
+    const c=b.dataset.add, r=CBHPM_BY_CODE[c]||{};
+    if(draft.procs.some(x=>String(x.codigo)===c)){ toast('Já está na lista'); return; }
+    let p=draft.procs.find(x=>!x.codigo);
+    if(!p){ p=blankProc(); draft.procs.push(p); }
+    p.codigo=c; p.nome=r.nome||''; p.porte='';
+    const mh=mediaPagaHistorica(c, draft.convenioId, draft.papel, p.id);
+    if(mh && ((+p.valorPrevisto||0)===0 || p._autoPrev)){ p.valorPrevisto=mh.media; p._autoPrev=true; }
+    b.disabled=true; b.style.opacity=.55; b.insertAdjacentHTML('afterbegin','<b style="color:var(--green);margin-right:4px">✓</b>');
+    toast('Adicionado: '+fmtCbhpm(c));
+  });
 }
 
 /* ============================================================
@@ -2277,19 +2432,24 @@ function viewConfig(){
    ============================================================ */
 function viewCbhpm(){
   const root=$('#viewRoot');
-  const f=state.filters.cb=state.filters.cb||{q:''};
-  const res=f.q? cbhpmSearch(f.q).slice(0,120):[];
+  const f=state.filters.cb=Object.assign({q:'',ed:'2018'}, state.filters.cb||{});
+  const res=f.q? cbhpmSearch(f.q, f.ed).slice(0,120):[];
+  const nEd = CBHPM.filter(x=>cbExistsIn(x, f.ed)).length;
   root.innerHTML=`
-    <div class="page-head"><div><h1>Tabela CBHPM</h1><p>${CBHPM.length.toLocaleString('pt-BR')} procedimentos de referência (consulta)</p></div></div>
-    <div class="toolbar"><input class="search" id="cbq" style="min-width:340px" placeholder="Buscar por código ou nome do procedimento..." value="${esc(f.q)}"></div>
+    <div class="page-head"><div><h1>Tabela CBHPM</h1><p>Consulta de códigos por edição · CBHPM ${f.ed}: ${nEd.toLocaleString('pt-BR')} procedimentos</p></div></div>
+    <div class="toolbar">
+      <input class="search" id="cbq" style="min-width:320px" placeholder="Buscar por código ou nome do procedimento..." value="${esc(f.q)}">
+      <select id="cbEd">${CBHPM_EDICOES.map(y=>`<option value="${y}" ${f.ed===y?'selected':''}>CBHPM ${y}</option>`).join('')}</select>
+    </div>
     <div class="card"><div class="card-body flush"><div class="t-wrap">
-    ${f.q? (res.length?`<table><thead><tr><th style="width:150px">Código</th><th>Procedimento</th><th style="width:80px">Porte</th></tr></thead><tbody>
-      ${res.map(m=>`<tr><td style="font-variant-numeric:tabular-nums;font-weight:600;color:var(--accent)">${fmtCbhpm(m.codigo)}</td><td>${esc(m.nome)}</td><td>${esc(m.porte)}</td></tr>`).join('')}
+    ${f.q? (res.length?`<table><thead><tr><th style="width:150px">Código</th><th>Procedimento</th><th style="width:130px">Edições</th></tr></thead><tbody>
+      ${res.map(m=>`<tr><td style="font-variant-numeric:tabular-nums;font-weight:600;color:var(--accent)">${fmtCbhpm(m.codigo)}</td><td>${esc(m.nome)}</td><td class="hint-txt">${(m.edicoes||[]).join(', ')}</td></tr>`).join('')}
     </tbody></table>${res.length>=120?'<div class="hint-txt" style="padding:10px 14px">Mostrando os primeiros 120 resultados — refine a busca.</div>':''}`
-      : emptyState('Nenhum resultado','Tente outro código ou termo.'))
-      : `<div class="empty">${iconBook()}<div style="margin-top:8px">Digite acima para pesquisar na tabela CBHPM</div></div>`}
+      : emptyState('Nenhum resultado nesta edição','Tente outro código/termo ou troque a edição.'))
+      : `<div class="empty">${iconBook()}<div style="margin-top:8px">Digite acima para pesquisar na CBHPM ${f.ed}</div></div>`}
     </div></div></div>`;
   $('#cbq').oninput=e=>{f.q=e.target.value;clearTimeout(window._cbt);window._cbt=setTimeout(viewCbhpm,180);};
+  $('#cbEd').onchange=e=>{f.ed=e.target.value;viewCbhpm();};
 }
 
 /* ============================================================
@@ -2303,6 +2463,7 @@ function iconDoc(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentC
 function iconHosp(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14"/><path d="M12 9v6M9 12h6"/></svg>`;}
 function iconBook(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`;}
 function iconGear(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;}
+function iconStar(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`;}
 
 /* ---------------- boot ---------------- */
 async function boot(){
