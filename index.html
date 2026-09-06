@@ -326,6 +326,15 @@ function load(){
   try{ const raw=localStorage.getItem(LS_DB); if(raw) db=JSON.parse(raw); }catch(e){}
   if(!db) db = SB_ON ? emptyDB() : seed();   // com login real, começa vazio (sem dados de exemplo)
   if(!Array.isArray(db.favoritos)) db.favoritos=[];
+  // migração: status de auditoria deixou de existir. Recusa da auditoria = recusa do plano depois da cirurgia.
+  (db.procedimentos||[]).forEach(p=>{
+    if('statusAuditoria' in p){
+      if(p.statusAuditoria==='Recusado' && p.statusPlano!=='Recusado'){ p.statusPlano='Recusado'; p.recusadoQuando=p.recusadoQuando||'Depois da cirurgia'; }
+      delete p.statusAuditoria;
+    }
+    if(p.statusPlano==='Recusado' && !p.recusadoQuando) p.recusadoQuando='Antes da cirurgia';
+    if(p.recusadoQuando===undefined) p.recusadoQuando='';
+  });
   return db;
 }
 function save(){ localStorage.setItem(LS_DB, JSON.stringify(DB)); }
@@ -363,38 +372,38 @@ function seed(){
       const ref=CBHPM_BY_CODE[p.codigo]||{};
       db.procedimentos.push(Object.assign({
         id:mkId('prc'), cirurgiaId:id, codigo:p.codigo, nome:ref.nome||p.nome||'', porte:'',
-        qtd:p.qtd||1, statusPlano:p.statusPlano||'Aguarda Aprovação', statusAuditoria:p.statusAuditoria||'Aguarda Auditoria',
-        motivoRecusa:p.motivoRecusa||'',
+        qtd:p.qtd||1, statusPlano:p.statusPlano||'Aguarda Aprovação',
+        recusadoQuando:p.recusadoQuando||'', motivoRecusa:p.motivoRecusa||'',
         valorPrevisto:p.valorPrevisto||0, valorPago:p.valorPago||0, dataPagamento:p.dataPagamento||''
       }));
     });
   }
 
   cir({paciente:'João Ribeiro', convenioId:cMap['Amil'], hospitalId:hMap['Memorial Star'], dataSolicitacao:'2026-01-10', dataCirurgia:'2026-01-16', carater:'Eletiva', papel:'Cirurgião', opme:'Kit artroscopia de joelho — 2 parafusos de interferência bioabsorvíveis, fio de sutura de alta resistência.\nFabricante: Arthrex · NF 4471 · R$ 2.400,00', obs:'Artroscopia de joelho'},[
-    {codigo:'30733057', valorPrevisto:1800, statusPlano:'Aprovado', statusAuditoria:'Aprovado', valorPago:1800, dataPagamento:'2026-02-15'},
-    {codigo:'30726212', valorPrevisto:900, statusPlano:'Aprovado', statusAuditoria:'Aprovado', valorPago:720, dataPagamento:'2026-02-15'},
+    {codigo:'30733057', valorPrevisto:1800, statusPlano:'Aprovado', valorPago:1800, dataPagamento:'2026-02-15'},
+    {codigo:'30726212', valorPrevisto:900, statusPlano:'Aprovado', valorPago:720, dataPagamento:'2026-02-15'},
   ]);
   cir({paciente:'José Santos', convenioId:cMap['Sulamérica'], hospitalId:hMap['H. Maria Lucinda'], dataSolicitacao:'2026-03-02', dataCirurgia:'2026-03-08', carater:'Urgência', papel:'1º Auxiliar', opme:'Haste femoral bloqueada + 4 parafusos de bloqueio.\nFabricante: Synthes · NF 5120 · R$ 8.000,00 (1 parafuso glosado na auditoria)', obs:'Fratura de fêmur'},[
-    {codigo:'30725127', valorPrevisto:3200, statusPlano:'Aprovado', statusAuditoria:'Aprovado', valorPago:3200, dataPagamento:'2026-05-10'},
-    {codigo:'30724082', valorPrevisto:2400, statusPlano:'Aprovado', statusAuditoria:'Recusado', motivoRecusa:'Ausência de autorização prévia', valorPago:0, dataPagamento:'2026-05-10'},
-    {codigo:'30726212', valorPrevisto:1900, statusPlano:'Aguarda Aprovação', statusAuditoria:'Aguarda Auditoria'},
+    {codigo:'30725127', valorPrevisto:3200, statusPlano:'Aprovado', valorPago:3200, dataPagamento:'2026-05-10'},
+    {codigo:'30724082', valorPrevisto:2400, statusPlano:'Recusado', recusadoQuando:'Depois da cirurgia', motivoRecusa:'Ausência de autorização prévia', valorPago:0, dataPagamento:'2026-05-10'},
+    {codigo:'30726212', valorPrevisto:1900, statusPlano:'Aguarda Aprovação'},
   ]);
   cir({paciente:'Maria Oliveira', convenioId:cMap['Bradesco Saúde'], hospitalId:hMap['Unimed I'], dataSolicitacao:'2026-05-20', dataCirurgia:'2026-05-27', carater:'Eletiva', papel:'Cirurgião', opme:'1 parafuso de interferência tibial + botão cortical femoral (endobutton).\nFabricante: Smith & Nephew · R$ 1.200,00', obs:'Reconstrução de LCA'},[
-    {codigo:'30733073', valorPrevisto:2600, statusPlano:'Aprovado', statusAuditoria:'Aprovado', valorPago:2600, dataPagamento:'2026-07-18'},
+    {codigo:'30733073', valorPrevisto:2600, statusPlano:'Aprovado', valorPago:2600, dataPagamento:'2026-07-18'},
   ]);
   cir({paciente:'Antônio Carvalho', convenioId:cMap['Unimed'], hospitalId:hMap['Unimed II'], dataSolicitacao:'2026-06-25', dataCirurgia:'2026-07-01', carater:'Eletiva', papel:'Cirurgião', opme:'Prótese total de quadril não cimentada: componente acetabular, cabeça femoral cerâmica, haste femoral.\nFabricante: Zimmer Biomet · NF 6033 · R$ 5.400,00', obs:'Prótese total de quadril'},[
-    {codigo:'30724058', valorPrevisto:4800, statusPlano:'Aprovado', statusAuditoria:'Aguarda Auditoria'},
-    {codigo:'30725119', valorPrevisto:1500, statusPlano:'Aguarda Aprovação', statusAuditoria:'Aguarda Auditoria'},
+    {codigo:'30724058', valorPrevisto:4800, statusPlano:'Aprovado'},
+    {codigo:'30725119', valorPrevisto:1500, statusPlano:'Aguarda Aprovação'},
   ]);
   cir({paciente:'Fernanda Lima', convenioId:cMap['Amil'], hospitalId:hMap['Memorial São José'], dataSolicitacao:'2026-07-15', dataCirurgia:'2026-07-22', carater:'Eletiva', papel:'2º Auxiliar', opme:'', obs:''},[
-    {codigo:'30733057', valorPrevisto:1600, statusPlano:'Aprovado', statusAuditoria:'Aguarda Auditoria'},
+    {codigo:'30733057', valorPrevisto:1600, statusPlano:'Aprovado'},
   ]);
   cir({paciente:'Paulo Mendes', convenioId:cMap['Geap'], hospitalId:hMap['HER'], dataSolicitacao:'2026-08-05', dataCirurgia:'2026-08-12', carater:'Urgência', papel:'Cirurgião', opme:'Placa bloqueada de fíbula distal + parafusos corticais e de bloqueio.\nR$ 2.100,00 · autorização de urgência', obs:'Fratura de tornozelo'},[
-    {codigo:'30728126', valorPrevisto:2800, statusPlano:'Aguarda Aprovação', statusAuditoria:'Aguarda Auditoria'},
-    {codigo:'30728096', valorPrevisto:1200, statusPlano:'Recusado', statusAuditoria:'Aguarda Auditoria'},
+    {codigo:'30728126', valorPrevisto:2800, statusPlano:'Aguarda Aprovação'},
+    {codigo:'30728096', valorPrevisto:1200, statusPlano:'Recusado', recusadoQuando:'Antes da cirurgia', motivoRecusa:'Procedimento não coberto pelo plano'},
   ]);
   cir({paciente:'Cláudia Rocha', convenioId:cMap['Particular'], hospitalId:hMap['Max Day'], dataSolicitacao:'2026-08-18', dataCirurgia:'2026-08-24', carater:'Eletiva', papel:'Cirurgião', opme:'Sem OPME.', obs:'Cirurgia de mão'},[
-    {codigo:'30722489', valorPrevisto:3500, statusPlano:'Aprovado', statusAuditoria:'Aprovado', valorPago:3500, dataPagamento:'2026-08-25'},
+    {codigo:'30722489', valorPrevisto:3500, statusPlano:'Aprovado', valorPago:3500, dataPagamento:'2026-08-25'},
   ]);
 
   return db;
@@ -436,10 +445,16 @@ const cirOf = id => DB.cirurgias.find(c=>c.id===id);
 /* ---------------- business rules ---------------- */
 function situacao(p){
   const prev=+p.valorPrevisto||0, pago=+p.valorPago||0;
-  // recusa do plano = não foi aprovado antes da cirurgia; não entra em pagamentos/glosa
-  if(p.statusPlano==='Recusado') return 'Recusado pelo plano';
-  // recusa da auditoria sem pagamento = glosa integral
-  if(p.statusAuditoria==='Recusado' && !pago && !p.dataPagamento) return 'Glosado';
+  if(p.statusPlano==='Recusado'){
+    // recusa antes da cirurgia (ou sem indicação) = procedimento não aprovado: não entra em pagamentos/glosa
+    if(p.recusadoQuando!=='Depois da cirurgia') return 'Recusado pelo plano';
+    // recusa depois da cirurgia = glosa
+    if(p.dataPagamento){
+      if(pago>=prev && prev>0) return 'Pago';
+      if(pago>0) return 'Glosa parcial';
+    }
+    return 'Glosado';
+  }
   if(p.dataPagamento){
     if(pago>=prev && prev>0) return 'Pago';
     if(pago>0) return 'Glosa parcial';
@@ -820,7 +835,7 @@ function openCirurgia(id){
   draft._tab = 1;
   renderCirModal();
 }
-function blankProc(){ return {id:null, codigo:'', nome:'', porte:'', qtd:1, statusPlano:'Aguarda Aprovação', statusAuditoria:'Aguarda Auditoria', motivoRecusa:'', valorPrevisto:0, valorPago:0, dataPagamento:''}; }
+function blankProc(){ return {id:null, codigo:'', nome:'', porte:'', qtd:1, statusPlano:'Aguarda Aprovação', recusadoQuando:'', motivoRecusa:'', valorPrevisto:0, valorPago:0, dataPagamento:''}; }
 
 const MOTIVOS_RECUSA = [
   'Ausência de autorização prévia',
@@ -871,7 +886,7 @@ function renderCirModal(){
     <div class="hint-txt" style="margin-bottom:8px">Um procedimento CBHPM por linha · códigos da <b>CBHPM ${convEdicao(draft.convenioId)}</b>${draft.convenioId?' (edição de '+esc(convName(draft.convenioId))+')':''}. Valores e pagamentos ficam na guia “Valores e pagamento”.</div>
     <div class="t-wrap"><table class="proc-table"><thead><tr>
       <th style="width:300px">Código / procedimento</th><th style="width:48px">Qtd</th>
-      <th style="width:140px">Status plano</th><th style="width:140px">Status auditoria</th><th style="width:200px">Motivo da recusa</th><th style="width:34px"></th>
+      <th style="width:150px">Status plano</th><th style="width:150px">Recusado quando</th><th style="width:190px">Motivo da recusa</th><th style="width:34px"></th>
     </tr></thead><tbody id="procRows">
       ${draft.procs.map((p,i)=>procRowHtml(p,i)).join('')}
     </tbody></table></div>
@@ -1011,9 +1026,11 @@ function procRowHtml(p,i){
       <input class="cb-input" data-f="codigo" placeholder="código (só números) ou nome do procedimento" value="${esc(p.codigo? fmtCbhpm(p.codigo)+' — '+p.nome : '')}" autocomplete="off" inputmode="text">
     </td>
     <td><input data-f="qtd" type="number" min="1" step="1" inputmode="numeric" value="${p.qtd||1}"></td>
-    <td><select data-f="statusPlano">${['Aguarda Aprovação','Aprovado','Recusado'].map(x=>`<option ${p.statusPlano===x?'selected':''}>${x}</option>`).join('')}</select></td>
-    <td><select data-f="statusAuditoria" data-rerender="1">${['Aguarda Auditoria','Aprovado','Recusado','—'].map(x=>`<option ${p.statusAuditoria===x?'selected':''}>${x}</option>`).join('')}</select></td>
-    <td>${p.statusAuditoria==='Recusado'
+    <td><select data-f="statusPlano" data-rerender="1">${['Aguarda Aprovação','Aprovado','Recusado'].map(x=>`<option ${p.statusPlano===x?'selected':''}>${x}</option>`).join('')}</select></td>
+    <td>${p.statusPlano==='Recusado'
+      ? `<select data-f="recusadoQuando"><option value="">Quando...</option>${['Antes da cirurgia','Depois da cirurgia'].map(x=>`<option ${p.recusadoQuando===x?'selected':''}>${x}</option>`).join('')}</select>`
+      : `<span style="color:var(--border)">—</span>`}</td>
+    <td>${p.statusPlano==='Recusado'
       ? `<select data-f="motivoRecusa"><option value="">Selecione o motivo...</option>${MOTIVOS_RECUSA.map(m=>`<option ${p.motivoRecusa===m?'selected':''}>${esc(m)}</option>`).join('')}</select>`
       : `<span style="color:var(--border)">—</span>`}</td>
     <td><button class="x-btn" data-del="${i}" title="Remover">&times;</button></td>
@@ -1122,7 +1139,7 @@ function ocrEmpty(){
   return {
     paciente:'', prontuario:'', convenio:'', hospital:'', dataSolicitacao:'', dataCirurgia:'',
     carater:'', papel:'', obs:'',
-    procedimentos:[],                 // {codigo,nome,qtd,statusPlano,statusAuditoria,valorPrevisto,valorPago,dataPagamento}
+    procedimentos:[],                 // {codigo,nome,qtd,statusPlano,recusadoQuando,valorPrevisto,valorPago,dataPagamento}
     _fonte:{ arquivos:[], geradoEm:'', engine:'' }
   };
 }
@@ -1165,8 +1182,8 @@ function ocrExtractMock(files){
   if(hit){
     r._fonte.engine = 'amostra';
     Object.assign(r, JSON.parse(JSON.stringify(hit.dados)));
-    r.procedimentos = (r.procedimentos||[]).map(p=>({codigo:p.codigo,nome:'',qtd:p.qtd||1,statusPlano:'Aguarda Aprovação',statusAuditoria:'Aguarda Auditoria',valorPrevisto:0,valorPago:0,dataPagamento:''}));
-    if(!r.procedimentos.length) r.procedimentos=[{codigo:'',nome:'',qtd:1,statusPlano:'Aguarda Aprovação',statusAuditoria:'Aguarda Auditoria',valorPrevisto:0,valorPago:0,dataPagamento:''}];
+    r.procedimentos = (r.procedimentos||[]).map(p=>({codigo:p.codigo,nome:'',qtd:p.qtd||1,statusPlano:'Aguarda Aprovação',recusadoQuando:'',motivoRecusa:'',valorPrevisto:0,valorPago:0,dataPagamento:''}));
+    if(!r.procedimentos.length) r.procedimentos=[{codigo:'',nome:'',qtd:1,statusPlano:'Aguarda Aprovação',recusadoQuando:'',motivoRecusa:'',valorPrevisto:0,valorPago:0,dataPagamento:''}];
     return r;
   }
   // sem amostra correspondente → estrutura vazia (leitor real ainda não plugado)
@@ -1174,7 +1191,7 @@ function ocrExtractMock(files){
   r.dataCirurgia = todayISO();
   r.carater = 'Eletiva';
   r.papel = 'Cirurgião';
-  r.procedimentos = [{codigo:'', nome:'', qtd:1, statusPlano:'Aguarda Aprovação', statusAuditoria:'Aguarda Auditoria', valorPrevisto:0, valorPago:0, dataPagamento:''}];
+  r.procedimentos = [{codigo:'', nome:'', qtd:1, statusPlano:'Aguarda Aprovação', valorPrevisto:0, valorPago:0, dataPagamento:''}];
   return r;
 }
 function openOcrImport(){
@@ -1261,7 +1278,7 @@ function ocrCollectReview(r){
   r.procedimentos = $$('#o-procs tr').map(tr=>{
     const f = n => { const el=tr.querySelector(`[data-of="${n}"]`); return el?el.value:''; };
     return { codigo:f('codigo'), nome:'', qtd:+f('qtd')||1,
-      statusPlano:'Aguarda Aprovação', statusAuditoria:'Aguarda Auditoria',
+      statusPlano:'Aguarda Aprovação',
       valorPrevisto:+f('valorPrevisto')||0, valorPago:+f('valorPago')||0, dataPagamento:f('dataPagamento') };
   }).filter(p=>String(p.codigo).replace(/\D/g,''));
   r._merge = $('#o-merge') ? $('#o-merge').checked : true;
@@ -1288,7 +1305,7 @@ function aplicarOcr(r){
     const code = String(p.codigo||'').replace(/\D/g,'');
     const ref = CBHPM_BY_CODE[code] || {};
     return { id:null, codigo:ref.codigo||code||'', nome:ref.nome||p.nome||'', porte:'',
-      qtd:+p.qtd||1, statusPlano:p.statusPlano||'Aguarda Aprovação', statusAuditoria:p.statusAuditoria||'Aguarda Auditoria',
+      qtd:+p.qtd||1, statusPlano:p.statusPlano||'Aguarda Aprovação', recusadoQuando:p.recusadoQuando||'', motivoRecusa:p.motivoRecusa||'',
       valorPrevisto:+p.valorPrevisto||0, valorPago:+p.valorPago||0, dataPagamento:p.dataPagamento||'' };
   }).filter(p=>p.codigo);
   if(rows.length){
@@ -1432,8 +1449,9 @@ function saveCirurgia(){
   procs.forEach(p=>{
     DB.procedimentos.push({
       id:uid('prc'),cirurgiaId:d.id,codigo:p.codigo,nome:p.nome,porte:p.porte,qtd:+p.qtd||1,
-      statusPlano:p.statusPlano,statusAuditoria:p.statusAuditoria,
-      motivoRecusa:p.statusAuditoria==='Recusado'?(p.motivoRecusa||''):'',
+      statusPlano:p.statusPlano,
+      recusadoQuando:p.statusPlano==='Recusado'?(p.recusadoQuando||''):'',
+      motivoRecusa:p.statusPlano==='Recusado'?(p.motivoRecusa||''):'',
       valorPrevisto:+p.valorPrevisto||0,valorPago:+p.valorPago||0,dataPagamento:p.dataPagamento||''
     });
   });
@@ -1446,8 +1464,8 @@ function saveCirurgia(){
 function viewPagamentos(){
   const root=$('#viewRoot');
   const f=state.filters.pg=Object.assign({local:'',pac:'',proc:'',de:'',ate:'',status:'aberto',aging:''}, state.filters.pg||{});
-  // procedimentos recusados pelo plano não entram em pagamentos (não foram aprovados antes da cirurgia)
-  const all=myProcs().map(p=>({p,c:cirOf(p.cirurgiaId)})).filter(x=>x.c && x.p.statusPlano!=='Recusado');
+  // recusa antes da cirurgia não entra em pagamentos; recusa depois da cirurgia é glosa e entra
+  const all=myProcs().map(p=>({p,c:cirOf(p.cirurgiaId)})).filter(x=>x.c && situacao(x.p)!=='Recusado pelo plano');
   const pacientes=[...new Set(myCirurgias().map(c=>c.paciente).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
   const procNames=[...new Set(all.map(({p})=>p.nome).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
 
@@ -1561,7 +1579,7 @@ function viewPagamentos(){
         <td><span style="font-variant-numeric:tabular-nums;color:var(--muted)">${fmtCbhpm(p.codigo)}</span><br>${esc(p.nome)}</td>
         <td class="num">${money(p.valorPrevisto)}</td>
         <td class="num" style="color:var(--green)">${p.valorPago?money(p.valorPago):'—'}</td>
-        <td><span class="badge ${SIT_BADGE[s]}">${s}</span>${p.dataPagamento?`<div class="hint-txt">${fmtDate(p.dataPagamento)}</div>`:''}${p.statusAuditoria==='Recusado'&&p.motivoRecusa?`<div class="hint-txt" style="color:var(--red)">Recusa: ${esc(p.motivoRecusa)}</div>`:''}</td>
+        <td><span class="badge ${SIT_BADGE[s]}">${s}</span>${p.dataPagamento?`<div class="hint-txt">${fmtDate(p.dataPagamento)}</div>`:''}${p.statusPlano==='Recusado'&&p.motivoRecusa?`<div class="hint-txt" style="color:var(--red)">Recusa: ${esc(p.motivoRecusa)}</div>`:''}</td>
         <td class="num"><button class="btn btn-sm" data-baixa="${p.id}">${p.dataPagamento?'Editar':'Dar baixa'}</button></td>
       </tr>`;}).join('')}
     </tbody></table>`:emptyState('Nada por aqui','Nenhum procedimento nesta situação / filtro.')}
@@ -1581,7 +1599,7 @@ function openBaixa(procId){
   const p=DB.procedimentos.find(x=>x.id===procId); if(!p) return;
   const c=cirOf(p.cirurgiaId);
   const editando = !!p.dataPagamento;
-  const d={valorPago:p.valorPago||p.valorPrevisto, dataPagamento:p.dataPagamento||todayISO(), statusPlano:p.statusPlano, statusAuditoria:p.statusAuditoria};
+  const d={valorPago:p.valorPago||p.valorPrevisto, dataPagamento:p.dataPagamento||todayISO(), statusPlano:p.statusPlano, recusadoQuando:p.recusadoQuando||'', motivoRecusa:p.motivoRecusa||''};
   $('#modal-root').innerHTML=`
   <div class="overlay" id="ov"><div class="modal" style="max-width:460px">
     <div class="modal-head"><h3>${editando?'Editar baixa':'Baixa de pagamento'}</h3><button class="x-btn" id="mx">&times;</button></div>
@@ -1595,8 +1613,8 @@ function openBaixa(procId){
         <div class="field"><label>Valor pago (R$)</label><input id="b-pago" type="number" step="0.01" value="${d.valorPago}"></div>
         <div class="field"><label>Data do pagamento</label><input id="b-data" type="date" value="${d.dataPagamento}"></div>
         <div class="field"><label>Status do plano</label><select id="b-plano">${['Aguarda Aprovação','Aprovado','Recusado'].map(x=>`<option ${d.statusPlano===x?'selected':''}>${x}</option>`).join('')}</select></div>
-        <div class="field"><label>Status da auditoria</label><select id="b-aud">${['Aguarda Auditoria','Aprovado','Recusado','—'].map(x=>`<option ${d.statusAuditoria===x?'selected':''}>${x}</option>`).join('')}</select></div>
-        <div class="field" id="b-motivo-wrap" ${d.statusAuditoria==='Recusado'?'':'hidden'}><label>Motivo da recusa</label><select id="b-motivo"><option value="">Selecione o motivo...</option>${MOTIVOS_RECUSA.map(m=>`<option ${p.motivoRecusa===m?'selected':''}>${esc(m)}</option>`).join('')}</select></div>
+        <div class="field" id="b-quando-wrap" ${d.statusPlano==='Recusado'?'':'hidden'}><label>Recusado quando</label><select id="b-quando"><option value="">Quando...</option>${['Antes da cirurgia','Depois da cirurgia'].map(x=>`<option ${d.recusadoQuando===x?'selected':''}>${x}</option>`).join('')}</select></div>
+        <div class="field" id="b-motivo-wrap" ${d.statusPlano==='Recusado'?'':'hidden'}><label>Motivo da recusa</label><select id="b-motivo"><option value="">Selecione o motivo...</option>${MOTIVOS_RECUSA.map(m=>`<option ${d.motivoRecusa===m?'selected':''}>${esc(m)}</option>`).join('')}</select></div>
         <div class="hint-txt" id="b-glosa"></div>
       </div>
     </div>
@@ -1611,14 +1629,15 @@ function openBaixa(procId){
   $('#mx').onclick=close;$('#mcancel').onclick=close;
   const upGlosa=()=>{ const g=(+p.valorPrevisto||0)-(+$('#b-pago').value||0); $('#b-glosa').textContent = g>0?`Glosa registrada: ${money(g)}`:(g<0?'Valor pago acima do previsto':''); $('#b-glosa').style.color=g>0?'var(--red)':'var(--muted)'; };
   $('#b-pago').oninput=upGlosa; upGlosa();
-  $('#b-aud').onchange=()=>{ $('#b-motivo-wrap').hidden = $('#b-aud').value!=='Recusado'; };
+  $('#b-plano').onchange=()=>{ const r=$('#b-plano').value==='Recusado'; $('#b-quando-wrap').hidden=!r; $('#b-motivo-wrap').hidden=!r; };
   $('#b-limpar').onclick=()=>{ p.valorPago=0;p.dataPagamento=''; save();close();toast('Baixa removida');render(); };
   $('#msave').onclick=()=>{
     p.valorPago=+$('#b-pago').value||0;
     p.dataPagamento=$('#b-data').value||todayISO();
     p.statusPlano=$('#b-plano').value;
-    p.statusAuditoria=$('#b-aud').value;
-    p.motivoRecusa = p.statusAuditoria==='Recusado' ? ($('#b-motivo').value||'') : '';
+    const rec = p.statusPlano==='Recusado';
+    p.recusadoQuando = rec ? ($('#b-quando').value||'') : '';
+    p.motivoRecusa = rec ? ($('#b-motivo').value||'') : '';
     save(); close(); toast('Baixa registrada'); render();
   };
 }
@@ -1825,15 +1844,15 @@ function viewResumo(){
       return {label:nameProc(k), value:o.v, sub:`${o.n}× ${tm?'· '+tm[0]:''}`, color:'#b91c1c'};
     }).sort((a,b)=>b.value-a.value).slice(0,8);
 
-    // glosa da auditoria por motivo
+    // glosa por motivo (recusa depois da cirurgia + glosa parcial)
     const glMot={};
-    S.forEach(x=>{ if(x.p.statusAuditoria!=='Recusado') return; const k=x.p.motivoRecusa||'(motivo não informado)';
-      (glMot[k]=glMot[k]||{v:0,n:0}); glMot[k].v+=(+x.p.valorPrevisto||0); glMot[k].n++; });
+    S.forEach(x=>{ const g=glosaDe(x.p); if(g<=0) return; const k=x.p.motivoRecusa||'(motivo não informado)';
+      (glMot[k]=glMot[k]||{v:0,n:0}); glMot[k].v+=g; glMot[k].n++; });
     const glMotRows=Object.entries(glMot).map(([k,o])=>({label:k,value:o.v,sub:`${o.n}×`,color:'#b45309'})).sort((a,b)=>b.value-a.value);
 
     // plano que mais recusou + hospital
     const recP={};
-    S.forEach(x=>{ if(x.p.statusPlano!=='Recusado' && x.p.statusAuditoria!=='Recusado') return;
+    S.forEach(x=>{ if(x.p.statusPlano!=='Recusado') return;
       const k=x.c.convenioId; (recP[k]=recP[k]||{n:0,h:{}}); recP[k].n++; recP[k].h[x.c.hospitalId]=(recP[k].h[x.c.hospitalId]||0)+1; });
     const recPRows=Object.entries(recP).map(([k,o])=>{
       const th=Object.entries(o.h).sort((a,b)=>b[1]-a[1])[0];
@@ -1876,7 +1895,7 @@ function viewResumo(){
       <div class="card"><div class="card-head"><h3>Procedimentos mais glosados</h3><span class="hint-txt">valor glosado · motivo dominante</span></div><div class="card-body">${hbars(glProcRows, money0)}</div></div>
 
       <div class="sec-grid">
-        <div class="card"><div class="card-head"><h3>Glosa da auditoria por motivo</h3><span class="hint-txt">valor previsto recusado</span></div><div class="card-body">${hbars(glMotRows, money0)}</div></div>
+        <div class="card"><div class="card-head"><h3>Glosa por motivo</h3><span class="hint-txt">valor glosado (recusa após a cirurgia)</span></div><div class="card-body">${hbars(glMotRows, money0)}</div></div>
         <div class="card"><div class="card-head"><h3>Recusas por convênio</h3><span class="hint-txt">plano + hospital onde mais recusa</span></div><div class="card-body">${hbars(recPRows, v=>v)}</div></div>
       </div>`;
   };
