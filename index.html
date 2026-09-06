@@ -173,6 +173,9 @@
   .info-dot:hover{filter:brightness(1.15)}
   .cbhpm-cell{position:relative}
   .cbhpm-drop{position:absolute;top:100%;left:0;right:0;z-index:30;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 30px rgba(0,0,0,.16);max-height:240px;overflow-y:auto;margin-top:3px}
+  .cbhpm-drop-fixed{position:fixed;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 14px 34px rgba(0,0,0,.2);max-height:260px;overflow-y:auto}
+  input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  input[type=number]{-moz-appearance:textfield;appearance:textfield}
   .cbhpm-opt{padding:7px 10px;cursor:pointer;font-size:12.5px;border-bottom:1px solid var(--border)}
   .cbhpm-opt:hover,.cbhpm-opt.hi{background:var(--accent-soft)}
   .cbhpm-opt .code{font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
@@ -289,6 +292,15 @@ function cbhpmSearch(q){
   q=(q||'').trim().toLowerCase();
   if(!q) return [];
   const digits=q.replace(/\D/g,'');
+  if(digits && !/[a-zà-ú]/.test(q)){            // busca só por código: prefixo primeiro
+    const pre=[], mid=[];
+    for(const p of CBHPM){
+      if(p.codigo.startsWith(digits)) pre.push(p);
+      else if(p.codigo.includes(digits)) mid.push(p);
+      if(pre.length>=40) break;
+    }
+    return pre.concat(mid).slice(0,40);
+  }
   const out=[];
   for(const p of CBHPM){
     if((digits && p.codigo.includes(digits)) || (q.length>=3 && p.nome.toLowerCase().includes(q))){
@@ -823,6 +835,7 @@ const CIR_TABS = [
 ];
 
 function renderCirModal(){
+  if(typeof cbHideDrop==='function') cbHideDrop();
   const isNew = !draft.id;
   const tab = draft._tab = Math.max(1, Math.min(3, draft._tab||1));
   const convs = myConvenios(), hosps = myHospitais();
@@ -912,7 +925,7 @@ function renderCirModal(){
     </div>
   </div>`;
 
-  const close=()=>{ $('#modal-root').innerHTML=''; };
+  const close=()=>{ cbHideDrop(); $('#modal-root').innerHTML=''; };
   $('#ov').onclick=e=>{ if(e.target.id==='ov') close(); };
   $('#mx').onclick=close; $('#mcancel').onclick=close;
 
@@ -989,11 +1002,10 @@ const syncProcInputs = syncCirDraft; // compat
 function procRowHtml(p,i){
   return `<tr data-pi="${i}">
     <td class="cbhpm-cell">
-      <input class="cb-input" data-f="codigo" placeholder="código ou nome..." value="${esc(p.codigo? fmtCbhpm(p.codigo)+' — '+p.nome : '')}" autocomplete="off">
-      <div class="cbhpm-drop" style="display:none"></div>
+      <input class="cb-input" data-f="codigo" placeholder="código (só números) ou nome do procedimento" value="${esc(p.codigo? fmtCbhpm(p.codigo)+' — '+p.nome : '')}" autocomplete="off" inputmode="text">
     </td>
     <td style="text-align:center">${esc(p.porte||'—')}</td>
-    <td><input data-f="qtd" type="number" min="1" value="${p.qtd||1}"></td>
+    <td><input data-f="qtd" type="number" min="1" step="1" inputmode="numeric" value="${p.qtd||1}"></td>
     <td><select data-f="statusPlano">${['Aguarda Aprovação','Aprovado','Recusado'].map(x=>`<option ${p.statusPlano===x?'selected':''}>${x}</option>`).join('')}</select></td>
     <td><select data-f="statusAuditoria" data-rerender="1">${['Aguarda Auditoria','Aprovado','Recusado','—'].map(x=>`<option ${p.statusAuditoria===x?'selected':''}>${x}</option>`).join('')}</select></td>
     <td>${p.statusAuditoria==='Recusado'
@@ -1003,51 +1015,87 @@ function procRowHtml(p,i){
   </tr>`;
 }
 
+/* dropdown único, fixo, fora de qualquer container com overflow */
+let _cbDrop=null;
+function cbDropEl(){
+  if(!_cbDrop){
+    _cbDrop=document.createElement('div');
+    _cbDrop.className='cbhpm-drop-fixed';
+    _cbDrop.style.display='none';
+    document.body.appendChild(_cbDrop);
+    window.addEventListener('resize', cbHideDrop);
+    window.addEventListener('scroll', cbHideDrop, true);
+  }
+  return _cbDrop;
+}
+function cbHideDrop(){ if(_cbDrop) _cbDrop.style.display='none'; }
+
 function bindProcRows(){
+  cbHideDrop();
   $$('#procRows tr').forEach(tr=>{
     const i=+tr.dataset.pi;
     tr.querySelectorAll('[data-f]:not(.cb-input)').forEach(el=>{
       el.onchange=()=>{ syncCirDraft(); if(el.dataset.rerender) renderCirModal(); };
     });
     tr.querySelector('[data-del]').onclick=()=>{
-      syncCirDraft();
+      syncCirDraft(); cbHideDrop();
       const p=draft.procs[i]||{};
       const preenchido = p.codigo || (+p.valorPrevisto||0) || (+p.valorPago||0);
       if(preenchido && !confirm(`Remover o procedimento ${p.codigo?fmtCbhpm(p.codigo):''} desta cirurgia?`)) return;
       draft.procs.splice(i,1); if(!draft.procs.length)draft.procs.push(blankProc()); renderCirModal();
     };
     const inp=tr.querySelector('.cb-input');
-    const drop=tr.querySelector('.cbhpm-drop');
     let hi=-1, matches=[];
-    const showMatches=()=>{
-      const raw=inp.value;
-      matches=cbhpmSearch(raw);
-      if(!matches.length){ drop.style.display='none'; return; }
-      drop.innerHTML=matches.map((m,k)=>`<div class="cbhpm-opt ${k===hi?'hi':''}" data-k="${k}"><span class="code">${fmtCbhpm(m.codigo)}</span> — ${esc(m.nome)} <span style="color:var(--muted)">(${m.porte})</span></div>`).join('');
-      drop.style.display='block';
-      drop.querySelectorAll('.cbhpm-opt').forEach(o=>o.onmousedown=e=>{ e.preventDefault(); pick(+o.dataset.k); });
+    const place=()=>{ const d=cbDropEl(), r=inp.getBoundingClientRect();
+      d.style.left=r.left+'px'; d.style.top=(r.bottom+2)+'px'; d.style.width=Math.max(r.width,260)+'px';
     };
-    const pick=k=>{
-      const m=matches[k]; if(!m) return;
+    const show=()=>{
+      matches=cbhpmSearch(inp.value);
+      const d=cbDropEl();
+      if(!matches.length){ d.style.display='none'; return; }
+      d.innerHTML=matches.map((m,k)=>`<div class="cbhpm-opt ${k===hi?'hi':''}" data-k="${k}"><span class="code">${fmtCbhpm(m.codigo)}</span> — ${esc(m.nome)} <span style="color:var(--muted)">(${m.porte})</span></div>`).join('');
+      d.querySelectorAll('.cbhpm-opt').forEach(o=>o.onmousedown=e=>{ e.preventDefault(); pick(+o.dataset.k); });
+      place(); d.style.display='block';
+    };
+    const setCode=(m)=>{
       const p=draft.procs[i];
       p.codigo=m.codigo; p.nome=m.nome; p.porte=m.porte;
-      // valor previsto: média histórica paga (código + convênio), se ainda não houver valor manual
       const mh=mediaPagaHistorica(p.codigo, draft.convenioId, draft.papel, p.id);
       if(mh && ((+p.valorPrevisto||0)===0 || p._autoPrev)){ p.valorPrevisto=mh.media; p._autoPrev=true; }
-      inp.value=fmtCbhpm(m.codigo)+' — '+m.nome;
-      drop.style.display='none';
-      renderCirModal();
     };
-    inp.oninput=()=>{ hi=-1; showMatches(); };
-    inp.onfocus=()=>{ if(inp.value) showMatches(); };
-    inp.onblur=()=>{ setTimeout(()=>drop.style.display='none',150);
-      if(!inp.value.trim()){ draft.procs[i].codigo='';draft.procs[i].nome='';draft.procs[i].porte=''; } };
+    const pick=k=>{ const m=matches[k]; if(!m) return; setCode(m); cbHideDrop(); renderCirModal(); };
+    /* resolve o texto digitado (código só números) mesmo sem escolher da lista */
+    const resolveTyped=()=>{
+      const digits=inp.value.replace(/\D/g,'');
+      if(digits.length<8) return false;
+      const m=CBHPM_BY_CODE[digits.slice(0,8)] || CBHPM.find(x=>x.codigo===digits.slice(0,8));
+      if(m){ setCode(m); return true; }
+      return false;
+    };
+    inp.oninput=()=>{ hi=-1; show(); };
+    inp.onfocus=show;
+    inp.onblur=()=>{
+      setTimeout(cbHideDrop,180);
+      const p=draft.procs[i], txt=inp.value.trim();
+      if(!txt){ if(p.codigo){ p.codigo='';p.nome='';p.porte=''; renderCirModal(); } return; }
+      const expected = p.codigo ? (fmtCbhpm(p.codigo)+' — '+p.nome) : '__none__';
+      if(txt===expected) return;                       // já resolvido, sem alteração
+      if(resolveTyped()){ renderCirModal(); return; }   // resolveu pelo código digitado (8 números)
+      if(p.codigo){ p.codigo='';p.nome='';p.porte=''; }
+      toast('Escolha o procedimento na lista ou digite o código completo (8 números)');
+    };
     inp.onkeydown=e=>{
-      if(drop.style.display==='none') return;
-      if(e.key==='ArrowDown'){ hi=Math.min(hi+1,matches.length-1); showMatches(); e.preventDefault(); }
-      else if(e.key==='ArrowUp'){ hi=Math.max(hi-1,0); showMatches(); e.preventDefault(); }
-      else if(e.key==='Enter'){ if(hi>=0){ pick(hi); e.preventDefault(); } }
-      else if(e.key==='Escape'){ drop.style.display='none'; }
+      if(e.key==='Enter'){
+        e.preventDefault();
+        if(hi>=0 && matches[hi]) return pick(hi);
+        if(matches.length===1) return pick(0);
+        if(resolveTyped()){ cbHideDrop(); renderCirModal(); }
+        return;
+      }
+      if(!_cbDrop || _cbDrop.style.display==='none') return;
+      if(e.key==='ArrowDown'){ hi=Math.min(hi+1,matches.length-1); show(); e.preventDefault(); }
+      else if(e.key==='ArrowUp'){ hi=Math.max(hi-1,0); show(); e.preventDefault(); }
+      else if(e.key==='Escape'){ cbHideDrop(); }
     };
   });
 }
