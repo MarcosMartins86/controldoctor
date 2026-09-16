@@ -241,6 +241,7 @@
 <div id="toast" class="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="cbhpm.js"></script>
 <script>
 /* ============================================================
@@ -320,12 +321,13 @@ function cbhpmSearch(q, ed){
 
 /* ---------------- storage ---------------- */
 let DB = load();
-function emptyDB(){ return { seq:0, medicos:[], convenios:[], hospitais:[], cirurgias:[], procedimentos:[], favoritos:[] }; }
+function emptyDB(){ return { seq:0, medicos:[], convenios:[], hospitais:[], cirurgias:[], procedimentos:[], favoritos:[], conciliacoes:[] }; }
 function load(){
   let db;
   try{ const raw=localStorage.getItem(LS_DB); if(raw) db=JSON.parse(raw); }catch(e){}
   if(!db) db = SB_ON ? emptyDB() : seed();   // com login real, começa vazio (sem dados de exemplo)
   if(!Array.isArray(db.favoritos)) db.favoritos=[];
+  if(!Array.isArray(db.conciliacoes)) db.conciliacoes=[];
   // migração: status de auditoria deixou de existir. Recusa da auditoria = recusa do plano depois da cirurgia.
   (db.procedimentos||[]).forEach(p=>{
     if('statusAuditoria' in p){
@@ -342,7 +344,7 @@ function uid(p='id'){ DB.seq=(DB.seq||0)+1; return p+DB.seq; }
 
 /* ---------------- seed ---------------- */
 function seed(){
-  const db = { seq:0, medicos:[], convenios:[], hospitais:[], cirurgias:[], procedimentos:[] };
+  const db = { seq:0, medicos:[], convenios:[], hospitais:[], cirurgias:[], procedimentos:[], favoritos:[], conciliacoes:[] };
   const mkId = p => { db.seq++; return p+db.seq; };
 
   const med = { id:mkId('med'), nome:'Dr. Ricardo Menezes', email:'ricardo@controldoctor.app', senha:'123456', crm:'CRM-PE 12345', esp:'Ortopedia e Traumatologia' };
@@ -730,7 +732,7 @@ function viewCirurgias(){
   root.innerHTML = `
     <div class="page-head">
       <div><h1>Procedimentos</h1><p id="cirCount"></p></div>
-      <button class="btn btn-primary" style="width:auto" id="novaCir">+ Nova cirurgia</button>
+      <button class="btn btn-primary" style="width:auto" id="novaCir">+ Procedimento</button>
     </div>
     <div class="toolbar">
       <input class="search" id="fpac" list="dlPac" placeholder="Nº prontuário ou paciente..." value="${esc(f.pac)}">
@@ -786,7 +788,7 @@ function viewCirurgias(){
           <td class="num" style="color:${t.aberto>0?'var(--amber)':'var(--muted)'}">${money0(t.aberto)}</td>
           <td class="num"><button class="chev" data-edit="${c.id}" title="Abrir">&rsaquo;</button></td>
         </tr>`;}).join('')}
-      </tbody></table>` : emptyState('Nenhuma cirurgia encontrada', all.length?'Ajuste os filtros para ampliar a busca.':'Clique em “Nova cirurgia” para começar.')}
+      </tbody></table>` : emptyState('Nenhum registro encontrado', all.length?'Ajuste os filtros para ampliar a busca.':'Clique em “+ Procedimento” para começar.')}
       </div></div></div>`;
     $$('#cirListWrap [data-edit]').forEach(b=>b.onclick=e=>{e.stopPropagation();openCirurgia(b.dataset.edit);});
     $$('#cirListWrap [data-cir]').forEach(tr=>tr.onclick=()=>openCirurgia(tr.dataset.cir));
@@ -1317,6 +1319,104 @@ function aplicarOcr(r){
 }
 
 /* ============================================================
+   LEITURA DE PDF (pdf.js) — extrai a camada de texto de um PDF,
+   reconstrói as linhas por posição (x/y) e devolve páginas de linhas.
+   Só funciona com PDF "de verdade" (com texto); PDF que é imagem
+   escaneada não tem camada de texto e cai no fluxo mock.
+   ============================================================ */
+let _pdfjsInit=false;
+function pdfjsOK(){
+  if(!window.pdfjsLib) return false;
+  if(!_pdfjsInit){ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; _pdfjsInit=true; }
+  return true;
+}
+async function pdfReadLines(file){
+  const data=new Uint8Array(await file.arrayBuffer());
+  const pdf=await pdfjsLib.getDocument({data}).promise;
+  const pages=[];
+  for(let n=1;n<=pdf.numPages;n++){
+    const tc=await (await pdf.getPage(n)).getTextContent();
+    const rows=[];
+    tc.items.forEach(it=>{
+      if(!it.str||!it.str.trim()) return;
+      const x=it.transform[4], y=it.transform[5];
+      let r=rows.find(z=>Math.abs(z.y-y)<=3);
+      if(!r){ r={y,items:[]}; rows.push(r); }
+      r.items.push({x,str:it.str});
+    });
+    rows.sort((a,b)=>b.y-a.y);
+    rows.forEach(r=>r.items.sort((a,b)=>a.x-b.x));
+    pages.push(rows.map(r=>({y:r.y,items:r.items,text:r.items.map(i=>i.str).join(' ').replace(/\s+/g,' ').trim()})));
+  }
+  return pages;
+}
+const _OPERADORAS=['BRADESCO','AMIL','SULAMERICA','SUL AMERICA','UNIMED','GEAP','CASSI','FUNCEF','PORTO SEGURO','MEDISERVICE','MEDSENIOR','SELECT','HAPVIDA','NOTREDAME','NOTRE DAME','PREVENT','GOLDEN CROSS','SAUDE CAIXA','SAÚDE CAIXA','PARTICULAR','IPSEP','IPSM','POSTAL','COOPVITA','CASF','PETROBRAS','CAIXA','ASSEFAZ','CAMED','CAPESESP','GAMA','LIFE','ALLIANZ','OMINT','CARE PLUS','SOMPO','SUL AMÉRICA','AMEPLAN','SÃO CRISTOVÃO','SAO CRISTOVAO'];
+const _norm=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase();
+const _brMoney=s=>{ const m=String(s).match(/([\d.]+),(\d{2})/); return m?+(m[1].replace(/\./g,'')+'.'+m[2]):null; };
+function brDateToISO(s){ const m=String(s||'').match(/(\d{2})\/(\d{2})\/(\d{4})/); return m?`${m[3]}-${m[2]}-${m[1]}`:''; }
+/* nome normalizado p/ comparação: sem acento, maiúsculas, só letras/números e espaço */
+function _nomeKey(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
+function nomesParecidos(a,b){
+  a=_nomeKey(a); b=_nomeKey(b);
+  if(!a||!b) return false;
+  if(a===b || a.includes(b) || b.includes(a)) return true;
+  const wa=a.split(' ').filter(w=>w.length>2), wb=b.split(' ').filter(w=>w.length>2);
+  const inter=wa.filter(w=>wb.includes(w)).length;
+  return inter>=2 && inter>=Math.min(wa.length,wb.length)*0.6;
+}
+
+/* Parser do "relatório de recebimentos" (uma linha por procedimento):
+   ... DATA  PACIENTE  CONVÊNIO  PLANO  CÓDIGO  PROCEDIMENTO ... VALOR ... VALOR(pago) */
+function parseExtratoRecebimentos(pages){
+  const itens=[];
+  pages.forEach((page,pi)=>{
+    page.forEach(ln=>{
+      const t=ln.text;
+      const codigo=(t.match(/\b(\d{8})\b/)||[])[1];
+      const datas=[...t.matchAll(/\b(\d{2}\/\d{2}\/\d{4})\b/g)].map(m=>m[1]);
+      const vals=[...t.matchAll(/R\$\s?([\d.]+,\d{2})/g)].map(m=>_brMoney(m[1]));
+      if(!codigo||!datas.length) return;
+      const dItem=ln.items.find(i=>/\d{2}\/\d{2}\/\d{4}/.test(i.str));
+      const cItem=ln.items.find(i=>i.str.replace(/\D/g,'')===codigo);
+      if(!dItem||!cItem||cItem.x<=dItem.x) return;
+      const mid=ln.items.filter(i=>i.x>dItem.x&&i.x<cItem.x).map(i=>i.str).join(' ').replace(/\s+/g,' ').trim();
+      let paciente=mid, convenio='';
+      const NM=_norm(mid); let cut=-1;
+      for(const op of _OPERADORAS){ const k=NM.indexOf(op); if(k>0 && (cut<0||k<cut)) cut=k; }
+      if(cut>0){ paciente=mid.slice(0,cut).trim(); convenio=mid.slice(cut).replace(/\s+(N\/A|APT|ENF|AMB|APH|SEC)\s*$/i,'').trim(); }
+      const status=(t.match(/\b(RECEBIDO|FATURADO|GLOSAD[OA]|PAGO|NEGAD[OA]|PENDENTE)\b/i)||[])[1]||'';
+      const apres=vals.length>1?vals[0]:(vals[0]??null);
+      const pago =vals.length?vals[vals.length-1]:null;
+      itens.push({
+        codigo, procedimento:'', paciente, convenio, hospital:'',
+        dataAtendimento:brDateToISO(datas[0]),
+        competencia:brDateToISO(datas[0]).slice(0,7),
+        valorApresentado:apres, valorPago:pago,
+        dataPagamento:datas.length>1?brDateToISO(datas[datas.length-1]):'',
+        glosa:(apres!=null&&pago!=null&&apres>pago)?+(apres-pago).toFixed(2):0,
+        motivoGlosa:'', status
+      });
+    });
+  });
+  return itens;
+}
+
+/* Ponto de entrada: recebe os File(s), tenta ler PDF de verdade.
+   Devolve { _fonte:{engine}, itens:[] } no mesmo formato do mock. */
+async function conciliacaoScan(files){
+  const pdfs=[...files].filter(f=>/\.pdf$/i.test(f.name)||f.type==='application/pdf');
+  if(pdfs.length && pdfjsOK()){
+    let itens=[];
+    for(const f of pdfs){
+      try{ itens=itens.concat(parseExtratoRecebimentos(await pdfReadLines(f))); }
+      catch(e){ console.warn('pdf.js falhou em',f.name,e); }
+    }
+    if(itens.length) return { _fonte:{arquivos:[...files].map(f=>f.name), geradoEm:new Date().toISOString(), engine:'pdf.js'}, itens };
+  }
+  return conciliacaoScanMock(files);
+}
+
+/* ============================================================
    CONCILIAÇÃO — extrato de pagamento em lote do convênio (MOCK)
    Cruza os itens do extrato com os procedimentos em aberto e
    registra os pagamentos em massa. Ponto único para plugar a
@@ -1343,23 +1443,67 @@ function conciliacaoScanMock(files){
     });
   return r;
 }
-function conciliacaoMatch(it){
-  if(it.procId){ const p=DB.procedimentos.find(x=>x.id===it.procId); if(p) return p; }
-  const code=String(it.codigo||'').replace(/\D/g,'');
-  if(!code) return null;
-  const cand=myProcs().map(p=>({p,c:cirOf(p.cirurgiaId)})).filter(x=>x.c
-    && String(x.p.codigo).replace(/\D/g,'')===code
-    && (!it.paciente || (x.c.paciente||'').toLowerCase()===String(it.paciente).toLowerCase()));
-  return cand.length===1 ? cand[0].p : null;
+/* ---- força do match: 3 sinais (data da cirurgia, código, paciente) ---- */
+function concFlags(it, x){   // x = {p, c}
+  const cd=String(it.codigo||'').replace(/\D/g,''), cp=String(x.p.codigo||'').replace(/\D/g,'');
+  const data=!!(it.dataAtendimento && x.c.dataCirurgia && it.dataAtendimento===x.c.dataCirurgia);
+  const cod =!!(cd && cp && cd===cp);
+  const nome=!!(it.paciente && nomesParecidos(x.c.paciente, it.paciente));
+  return { data, cod, nome, n:(data?1:0)+(cod?1:0)+(nome?1:0) };
 }
+/* melhor procedimento EM ABERTO para uma linha do extrato — SEMPRE do mesmo
+   paciente (por aproximação). Nunca sugere nem deixa escolher o procedimento
+   de outro paciente: se não há nenhum procedimento aberto desse paciente,
+   devolve null (linha fica "não reconhecida" / vai para o cadastro em lote). */
+function concMelhor(it, usados){
+  usados = usados || new Set();
+  if(it.procId){ const p=DB.procedimentos.find(z=>z.id===it.procId), c=p&&cirOf(p.cirurgiaId);
+    if(p&&c&&!p.dataPagamento) return { p, c, flags:concFlags(it,{p,c}) }; }
+  if(!it.paciente) return null;
+  let best=null;
+  myProcs().map(p=>({p,c:cirOf(p.cirurgiaId)}))
+    .filter(x=>x.c && !x.p.dataPagamento && !usados.has(x.p.id) && nomesParecidos(x.c.paciente, it.paciente))
+    .forEach(x=>{
+      const f=concFlags(it,x);                     // f.nome já é sempre true aqui
+      const r=(f.data?2:0)+(f.cod?1:0);             // desempate entre procs do MESMO paciente
+      if(!best || f.n>best.flags.n || (f.n===best.flags.n && r>best._r)) best={ p:x.p, c:x.c, flags:f, _r:r };
+    });
+  return best;
+}
+
+/* monta o estado editável da revisão a partir do resultado do scan */
+function concBuildRev(scan, arquivo){
+  const engine=(scan._fonte||{}).engine||'mock';
+  const linhas=(scan.itens||[]).map((it,i)=>{
+    const best=concMelhor(it);
+    // auto-marca só quando o paciente confere e há 2+ sinais (evita casar
+    // "data + código de consulta" de pacientes diferentes)
+    const forte = best && best.flags.n>=2 && best.flags.nome;
+    return { _i:i, it,
+      procId: best? best.p.id : '',
+      incluir: !!forte,
+      _filtro: '',   // refino extra do dropdown (por código), por linha
+      valorPago: it.valorPago!=null ? it.valorPago : '',
+      dataPagamento: it.dataPagamento || todayISO(),
+      flags: best? best.flags : {data:false,cod:false,nome:false,n:0} };
+  });
+  // se 2 linhas apontam o mesmo procedimento, mantém a de maior score
+  const dono={};
+  linhas.forEach(L=>{ if(!L.procId) return; if(!dono[L.procId] || L.flags.n>dono[L.procId].flags.n) dono[L.procId]=L; });
+  linhas.forEach(L=>{ if(L.procId && dono[L.procId]!==L){ L.procId=''; L.incluir=false; L.flags={data:false,cod:false,nome:false,n:0}; } });
+  const ds=linhas.map(L=>L.it.dataAtendimento).filter(Boolean).sort();
+  return { arquivo, engine, linhas, de: ds[0]||'', ate: ds[ds.length-1]||'' };
+}
+
+let _concRev=null;
 function openConciliacao(){
   $('#modal-root').insertAdjacentHTML('beforeend', `
   <div class="overlay" id="concOv" style="z-index:140">
     <div class="modal lg">
       <div class="modal-head"><h3>Documento de conciliação — pagamento em lote</h3><button class="x-btn" id="concX">&times;</button></div>
       <div class="modal-body">
-        <p class="hint-txt" style="margin-top:0">Carregue o extrato de pagamento do convênio (PDF, planilha ou foto). O sistema cruza os itens com os procedimentos em aberto e registra os pagamentos em massa.</p>
-        <input type="file" id="concFile" accept="image/*,application/pdf,.csv,.xlsx,.xls" multiple>
+        <p class="hint-txt" style="margin-top:0"><b>Um arquivo por lote.</b> PDF com camada de texto é lido de verdade; imagem/scan cai em modo demonstração. Cruza com os procedimentos <b>em aberto</b> por 3 sinais: data da cirurgia, código e paciente.</p>
+        <input type="file" id="concFile" accept="application/pdf,image/*,.csv,.xlsx,.xls">
         <div id="concReview" style="margin-top:14px"></div>
       </div>
       <div class="modal-foot">
@@ -1368,64 +1512,263 @@ function openConciliacao(){
       </div>
     </div>
   </div>`);
-  const ov=$('#concOv'); const close=()=>ov.remove();
+  const ov=$('#concOv'); const close=()=>{ _concRev=null; ov.remove(); };
   $('#concX').onclick=close; $('#concCancel').onclick=close;
   ov.onclick=e=>{ if(e.target.id==='concOv') close(); };
-  let result=null;
-  $('#concFile').onchange=e=>{
-    const files=[...e.target.files]; if(!files.length) return;
-    result=conciliacaoScanMock(files);
-    $('#concReview').innerHTML=conciliacaoReviewHtml(result);
-    const n=(result.itens||[]).filter(conciliacaoMatch).length;
-    const btn=$('#concApply'); btn.style.display=''; btn.disabled=!n;
-    btn.textContent = n ? `Aplicar a ${n} procedimento(s)` : 'Nenhuma correspondência';
+  $('#concFile').onchange=async e=>{
+    const file=e.target.files[0]; if(!file) return;
+    $('#concReview').innerHTML='<div class="hint-txt">Lendo o arquivo…</div>';
+    let scan;
+    try{ scan=await conciliacaoScan([file]); }
+    catch(err){ console.error(err); scan=conciliacaoScanMock([file]); toast('Não consegui ler o PDF — modo demonstração'); }
+    _concRev=concBuildRev(scan, file.name);
+    concRenderRev();
   };
   $('#concApply').onclick=()=>{
-    if(!result) return;
-    const n=aplicarConciliacao(result);
-    close(); toast(n?`${n} procedimento(s) conciliado(s)`:'Nenhum item correspondeu'); render();
+    if(!_concRev) return;
+    const lote=aplicarConciliacao(_concRev);
+    close();
+    toast(lote.aplicados ? `${lote.aplicados} pagamento(s) conciliado(s)` : 'Nada aplicado');
+    render();
   };
 }
-function conciliacaoReviewHtml(r){
-  const itens=r.itens||[];
-  const matched=itens.filter(conciliacaoMatch).length;
-  return `
-  <div class="hint-txt" style="background:var(--amber-soft);color:var(--amber);border-radius:8px;padding:9px 11px;margin-bottom:10px">
-    ⚠ Conciliação em modo demonstração (mock): os itens abaixo <b>não</b> foram lidos do arquivo. Estrutura pronta para plugar a leitura real do extrato.
-  </div>
-  <div class="hint-txt" style="margin-bottom:8px">${itens.length} item(ns) no extrato · <b>${matched}</b> com correspondência nos procedimentos em aberto.</div>
-  <div class="t-wrap"><table><thead><tr>
-    <th>Código</th><th>Paciente</th><th>Convênio</th><th>Hospital</th><th class="num">Apresentado</th><th class="num">Pago</th><th class="num">Glosa</th><th>Data pgto</th><th></th>
-  </tr></thead><tbody>
-    ${itens.map(it=>{
-      const m=conciliacaoMatch(it);
-      return `<tr>
-        <td style="font-variant-numeric:tabular-nums">${esc(fmtCbhpm(it.codigo))}</td>
-        <td>${esc(it.paciente||'')}</td>
-        <td>${esc(it.convenio||'')}</td>
-        <td>${esc(it.hospital||'')}</td>
-        <td class="num">${money(it.valorApresentado)}</td>
-        <td class="num" style="color:var(--green)">${money(it.valorPago)}</td>
-        <td class="num" style="color:${(+it.glosa||0)>0?'var(--red)':'var(--muted)'}">${(+it.glosa||0)>0?money(it.glosa):'—'}</td>
-        <td>${fmtDate(it.dataPagamento)}</td>
-        <td>${m?'<span class="badge b-green">✓ corresponde</span>':'<span class="badge b-gray">—</span>'}</td>
-      </tr>`;
-    }).join('')}
-  </tbody></table></div>
-  <div class="hint-txt" style="margin-top:8px">Apenas as linhas “✓ corresponde” serão aplicadas (valor pago, data e — se vazio — valor apresentado como previsto).</div>`;
+
+/* Cadastro em lote das linhas "não reconhecidas": o médico informa UMA VEZ o
+   hospital e o convênio (o documento inteiro é de um hospital só) e essas linhas
+   passam a ter paciente/data/código/valores/data de pagamento vindos do PDF,
+   status do plano "Aprovado" (já foi pago). Prontuário, caráter, papel e
+   observações ficam em branco para completar depois. Só fica pendente ao
+   clicar "Aplicar" — a criação de fato acontece em aplicarConciliacao(). */
+function openConcNovo(){
+  const rv=_concRev; if(!rv) return;
+  const alvo=rv.linhas.filter(L=>L.flags.n===0 && !L.procId && !L._novo);
+  if(!alvo.length) return;
+  const hosps=myHospitais(), convs=myConvenios();
+  $('#modal-root').insertAdjacentHTML('beforeend', `
+  <div class="overlay" id="cnOv" style="z-index:160"><div class="modal" style="max-width:420px">
+    <div class="modal-head"><h3>Cadastrar ${alvo.length} não reconhecida(s)</h3><button class="x-btn" id="cnX">&times;</button></div>
+    <div class="modal-body">
+      <p class="hint-txt" style="margin-top:0">Paciente, data, código e valores vêm do PDF; status do plano entra como <b>Aprovado</b> e o pagamento já fica registrado. Informe hospital e convênio — valem para as <b>${alvo.length}</b> linhas. Prontuário, caráter, papel e observações ficam em branco para completar depois.</p>
+      <div class="stack">
+        <div class="field"><label>Hospital *</label><select id="cn-hosp"><option value="">Selecione...</option>${hosps.map(h=>`<option value="${h.id}">${esc(h.nome)}</option>`).join('')}</select></div>
+        <div class="field"><label>Convênio *</label><select id="cn-conv"><option value="">Selecione...</option>${convs.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')}</select></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn" id="cnCancel">Cancelar</button><button class="btn btn-primary" style="width:auto" id="cnOk">Aplicar aos ${alvo.length}</button></div>
+  </div></div>`);
+  const close=()=>{ const el=$('#cnOv'); if(el) el.remove(); };
+  $('#cnX').onclick=close; $('#cnCancel').onclick=close;
+  $('#cnOv').onclick=e=>{ if(e.target.id==='cnOv') close(); };
+  $('#cnOk').onclick=()=>{
+    const hospitalId=$('#cn-hosp').value, convenioId=$('#cn-conv').value;
+    if(!hospitalId||!convenioId){ toast('Selecione hospital e convênio'); return; }
+    alvo.forEach(L=>{
+      L._novo={hospitalId, convenioId};
+      L.incluir=true;
+      L.valorPago = L.it.valorPago!=null ? L.it.valorPago : (L.it.valorApresentado||0);
+      L.dataPagamento = L.it.dataPagamento || L.it.dataAtendimento || todayISO();
+      L.flags={data:true,cod:true,nome:true,n:3};
+    });
+    close(); concRenderRev();
+  };
 }
-function aplicarConciliacao(r){
-  let n=0;
-  (r.itens||[]).forEach(it=>{
-    const p=conciliacaoMatch(it); if(!p) return;
-    if(it.valorPago!=null) p.valorPago=+it.valorPago||0;
-    if(it.dataPagamento) p.dataPagamento=it.dataPagamento;
-    if(!(+p.valorPrevisto||0) && (+it.valorApresentado||0)) p.valorPrevisto=+it.valorApresentado||0;
-    n++;
+
+function concRenderRev(){
+  const rv=_concRev; if(!rv) return;
+  const abertos=myProcs().map(p=>({p,c:cirOf(p.cirurgiaId)})).filter(x=>x.c && !x.p.dataPagamento);
+  const hayOf=x=>_nomeKey(`${String(x.p.codigo).replace(/\D/g,'')} ${x.p.nome} ${x.c.paciente}`);
+  const dOK=(x,L)=>L.it.dataAtendimento && x.c.dataCirurgia===L.it.dataAtendimento;
+  const pOK=(x,L)=>L.it.paciente && nomesParecidos(x.c.paciente,L.it.paciente);
+  const cOK=(x,L)=>{ const a=String(x.p.codigo).replace(/\D/g,''), b=String(L.it.codigo).replace(/\D/g,''); return a&&b&&a===b; };
+  /* pool de UMA linha: procedimentos EM ABERTO do MESMO PACIENTE (por aproximação) —
+     travado sempre, nunca lista nem deixa escolher procedimento de outro paciente.
+     Dentro do pool, ainda respeita data/código já casados; `_filtro` só refina
+     por código dentro do próprio pool. */
+  const poolPaciente=L=>abertos.filter(x=>pOK(x,L));
+  const optCands=L=>{
+    const pool=poolPaciente(L);
+    let cand=pool.filter(x=>(!L.flags.data||dOK(x,L)) && (!L.flags.cod||cOK(x,L)));
+    if(!cand.length) cand=pool;
+    const fq=_nomeKey(L._filtro||'');
+    if(fq){
+      const f2=cand.filter(x=>{ const hay=hayOf(x);
+        if(hay.includes(fq)) return true;
+        const toks=fq.split(' ').filter(t=>t.length>2);
+        return toks.length>=2 && toks.filter(t=>hay.includes(t)).length>=2; });
+      if(f2.length) cand=f2;
+    }
+    if(L.procId && !cand.some(x=>x.p.id===L.procId)){ const cur=pool.find(x=>x.p.id===L.procId); if(cur) cand=[cur,...cand]; }
+    return cand.slice().sort((a,b)=>(a.c.dataCirurgia||'').localeCompare(b.c.dataCirurgia||'')||String(a.p.codigo).localeCompare(String(b.p.codigo)));
+  };
+  const optsFor=(L,kind)=>{
+    const lbl=x=> kind==='codigo' ? esc(fmtCbhpm(x.p.codigo))
+      : fmtDate(x.c.dataCirurgia)+' · '+esc(fmtCbhpm(x.p.codigo));
+    return `<option value="">— escolher —</option>`+optCands(L).map(x=>
+      `<option value="${x.p.id}" ${L.procId===x.p.id?'selected':''}>${lbl(x)}</option>`).join('');
+  };
+  const dot=v=>`<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${v?'#15803d':'var(--border)'};margin-right:2px"></span>`;
+  const flagsCell=f=>`<div title="data ${f.data?'✓':'✗'} · procedimento ${f.cod?'✓':'✗'} · paciente ${f.nome?'✓':'✗'}" style="white-space:nowrap">${dot(f.data)}${dot(f.cod)}${dot(f.nome)}</div><div class="hint-txt">${f.n} sinal${f.n===1?'':'is'}</div>`;
+  const tint=f=>f.n>=3?'background:rgba(21,128,61,.10)':f.n===2?'background:rgba(21,128,61,.045)':'';
+  const rec=rv.linhas.filter(L=>L.flags.n>=1).sort((a,b)=>b.flags.n-a.flags.n);
+  const nao=rv.linhas.filter(L=>L.flags.n===0);
+  const SLOT='min-height:24px;display:flex;align-items:center;gap:4px';
+
+  const rowHtml=L=>{
+    const proc=L.procId?DB.procedimentos.find(x=>x.id===L.procId):null;
+    const alvo=proc?cirOf(proc.cirurgiaId):null;
+    const trava = (L.flags.n>=3) && (!!(proc&&alvo) || !!L._novo);  // 3 sinais (ou novo cadastro): sem ajuste
+    const prev = proc ? (+proc.valorPrevisto||0) : (L._novo ? ((+L.it.valorApresentado||0)||(+L.valorPago||0)) : 0);
+    const pago=+L.valorPago||0;
+    const glosa=prev>0?Math.max(0,prev-pago):0;
+    const ok=t=>`<span style="color:var(--green)">✓ ${t}</span>`;
+    const impl=t=>`<span class="hint-txt">${t||'—'}</span>`;
+    let sistema;
+    if(trava && proc && alvo){
+      sistema=`<div style="${SLOT}">${ok(fmtDate(alvo.dataCirurgia))}</div><div style="${SLOT}">${ok(esc(alvo.paciente))}</div><div style="${SLOT}">${ok(esc(fmtCbhpm(proc.codigo)))}</div>`;
+    } else if(trava && L._novo){
+      sistema=`<div style="${SLOT}">${ok(fmtDate(L.it.dataAtendimento))}</div><div style="${SLOT}">${ok(esc(L.it.paciente||'—'))}</div><div style="${SLOT}">${ok(esc(fmtCbhpm(L.it.codigo)))}</div>
+        <div class="hint-txt" style="color:var(--indigo)">🆕 novo cadastro — ${esc(hospName(L._novo.hospitalId))} · ${esc(convName(L._novo.convenioId))}</div>`;
+    } else {
+      // paciente é SEMPRE travado: as opções nunca saem do pool do mesmo paciente.
+      // só data e código ficam abertos para escolha.
+      const pool=poolPaciente(L);
+      if(!pool.length){
+        sistema=`<div style="${SLOT}">${impl('sem procedimento em aberto para "'+esc(L.it.paciente||'?')+'"')}</div>
+          <div class="hint-txt">Use "🆕 Cadastrar" abaixo para registrar este paciente.</div>`;
+      } else {
+        const openSlot = !L.flags.data ? 'data' : (!L.flags.cod ? 'codigo' : null);
+        const slotR=(kind)=>{
+          const matched = kind==='data' ? L.flags.data : L.flags.cod;
+          const valImpl = !proc ? '' : (kind==='data' ? fmtDate(alvo.dataCirurgia) : esc(fmtCbhpm(proc.codigo)));
+          if(matched) return ok(kind==='data' ? fmtDate(L.it.dataAtendimento) : esc(fmtCbhpm(L.it.codigo)));
+          if(openSlot===kind) return `<select data-cf="procId" style="width:100%">${optsFor(L,kind)}</select>`;
+          return impl(valImpl);
+        };
+        sistema=`<div style="${SLOT}">${slotR('data')}</div><div style="${SLOT}">${ok(esc(L.it.paciente||'—'))}</div><div style="${SLOT}">${slotR('codigo')}</div>`
+          + `<input data-cf="_filtro" value="${esc(L._filtro||'')}" placeholder="refinar por código" style="width:100%;font-size:12px;margin-top:4px">`;
+      }
+    }
+    const rowBg = L._novo ? 'background:rgba(79,70,229,.06)' : tint(L.flags);
+    return `<tr data-li="${L._i}" style="${rowBg};vertical-align:top">
+      <td style="white-space:nowrap"><input type="checkbox" data-cf="incluir" ${L.incluir?'checked':''}> ${flagsCell(L.flags)}</td>
+      <td>
+        <div style="${SLOT}"><b>${fmtDate(L.it.dataAtendimento)}</b></div>
+        <div style="${SLOT}">${esc(L.it.paciente||'—')}</div>
+        <div style="${SLOT}"><span class="hint-txt" style="font-variant-numeric:tabular-nums">${esc(fmtCbhpm(L.it.codigo))}</span></div>
+      </td>
+      <td style="min-width:240px">${sistema}</td>
+      <td style="min-width:150px">
+        <div class="hint-txt">Apresentado: ${money(L.it.valorApresentado)}</div>
+        <div>Pago: ${trava
+          ? `<b>${money(pago)}</b>`
+          : `<input type="number" step="0.01" data-cf="valorPago" value="${L.valorPago}" style="width:96px;text-align:right">`}</div>
+        <div class="hint-txt" style="color:${glosa>0?'var(--red)':'var(--muted)'}">Glosa: ${glosa>0?money(glosa):'—'}</div>
+        <div class="hint-txt">Data pgto: ${trava
+          ? fmtDate(L.dataPagamento)
+          : `<input type="date" data-cf="dataPagamento" value="${L.dataPagamento||''}">`}</div>
+      </td>
+    </tr>`;
+  };
+  const head=`<tr><th style="width:78px">Incluir</th><th>Do PDF</th><th>Correspondência no sistema</th><th>Valores</th></tr>`;
+  const sel=rv.linhas.filter(L=>L.incluir&&(L.procId||L._novo));
+  const totApres=rv.linhas.reduce((s,L)=>s+(+L.it.valorApresentado||0),0);
+  const totPDF=rv.linhas.reduce((s,L)=>s+(+L.it.valorPago||0),0);
+  const totBaixar=sel.reduce((s,L)=>s+(+L.valorPago||0),0);
+
+  $('#concReview').innerHTML=`
+    <div class="hint-txt" style="background:${rv.engine==='pdf.js'?'var(--accent-soft);color:var(--accent)':'var(--amber-soft);color:var(--amber)'};border-radius:8px;padding:9px 11px;margin-bottom:10px">
+      ${rv.engine==='pdf.js'?`✓ Lido do PDF <b>${esc(rv.arquivo)}</b> — ${rv.linhas.length} linha(s).`:`⚠ Modo demonstração — o arquivo não foi lido. Use um PDF de extrato com camada de texto.`}
+Cada linha mostra <b>data · paciente · código</b>. O <b>paciente nunca muda</b> — as opções de escolha são sempre só datas e procedimentos <i>do mesmo paciente</i>. O que casou aparece com ✓; data/código que faltarem viram lista, na mesma posição. 3 sinais entram travados.
+    </div>
+    <div class="t-wrap"><table class="tbl-compact"><thead>${head}</thead><tbody>
+      ${rec.map(rowHtml).join('') || `<tr><td colspan="4" class="hint-txt" style="padding:12px">Nenhuma linha com sinal.</td></tr>`}
+    </tbody></table></div>
+    ${nao.length?`
+    <div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn btn-sm" id="concNovoBtn" type="button">🆕 Cadastrar as ${nao.length} não reconhecida(s) — um hospital/convênio para todas</button>
+    </div>
+    <details style="margin-top:6px"><summary class="hint-txt" style="cursor:pointer">${nao.length} linha(s) não reconhecida(s) — abrir para apontar manualmente</summary>
+      <div class="t-wrap" style="margin-top:6px"><table class="tbl-compact"><thead>${head}</thead><tbody>${nao.map(rowHtml).join('')}</tbody></table></div></details>`:''}
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:12px;font-size:13px">
+      <div class="hint-txt">PDF: apresentado <b>${money0(totApres)}</b> · pago <b>${money0(totPDF)}</b> · ${rv.linhas.length} linha(s)</div>
+      <div>Vai baixar: <b>${money0(totBaixar)}</b> em <b>${sel.length}</b> procedimento(s)</div>
+    </div>`;
+
+  const btn=$('#concApply'); btn.style.display=''; btn.disabled=!sel.length;
+  btn.textContent = sel.length ? `Aplicar a ${sel.length} procedimento(s)` : 'Nada selecionado';
+
+  const btnNovo=$('#concNovoBtn'); if(btnNovo) btnNovo.onclick=openConcNovo;
+  $$('#concReview [data-cinfo]').forEach(el=>el.onclick=()=>toast(el.dataset.cinfo));
+  $$('#concReview tr[data-li]').forEach(tr=>{
+    const L=rv.linhas[+tr.dataset.li]; if(!L) return;
+    // filtro do dropdown: atualização local (não redesenha a tabela toda)
+    const filt=tr.querySelector('[data-cf="_filtro"]');
+    if(filt) filt.oninput=()=>{
+      L._filtro=filt.value;
+      const kind = !L.flags.data?'data':'codigo';
+      const s=tr.querySelector('[data-cf="procId"]'); if(s) s.innerHTML=optsFor(L,kind);
+    };
+    tr.querySelectorAll('[data-cf]').forEach(el=>{
+      const f=el.dataset.cf;
+      if(f==='_filtro') return;
+      el.onchange=()=>{
+        if(f==='incluir') L.incluir=el.checked;
+        else if(f==='procId'){ L.procId=el.value;
+          const proc=L.procId?DB.procedimentos.find(x=>x.id===L.procId):null;
+          const cx=proc&&cirOf(proc.cirurgiaId);
+          L.flags = proc&&cx ? concFlags(L.it,{p:proc,c:cx}) : {data:false,cod:false,nome:false,n:0};
+          if(!L.procId) L.incluir=false;
+        }
+        else L[f]=el.value;
+        concRenderRev();
+      };
+    });
   });
-  if(n) save();
-  return n;
 }
+
+function aplicarConciliacao(rv){
+  const lote={ id:uid('conc'), medicoId:M(), arquivo:rv.arquivo, engine:rv.engine,
+    dataConciliacao:todayISO(), criadoEm:new Date().toISOString(),
+    totalApresentado:0, totalPagoPDF:0, totalBaixado:0, totalGlosa:0,
+    linhas:(rv.linhas||[]).length, aplicados:0, semBaixa:0, itens:[] };
+  (rv.linhas||[]).forEach(L=>{ lote.totalApresentado+=+L.it.valorApresentado||0; lote.totalPagoPDF+=+L.it.valorPago||0; });
+  const usados=new Set();
+  (rv.linhas||[]).forEach(L=>{
+    if(!L.incluir) return;
+    let p;
+    if(L.procId){
+      if(usados.has(L.procId)) return;
+      p=DB.procedimentos.find(x=>x.id===L.procId); if(!p) return;
+    } else if(L._novo){
+      // cadastro em lote: cria a cirurgia e o procedimento a partir do que o PDF trouxe
+      const cirId=uid('cir');
+      DB.cirurgias.push({ id:cirId, medicoId:M(), paciente:L.it.paciente||'', prontuario:'',
+        convenioId:L._novo.convenioId, hospitalId:L._novo.hospitalId,
+        dataSolicitacao:'', dataCirurgia:L.it.dataAtendimento||todayISO(),
+        carater:'', papel:'', obs:'Criado a partir da conciliação de pagamentos.' });
+      const ref=CBHPM_BY_CODE[String(L.it.codigo||'').replace(/\D/g,'')]||{};
+      const prevVal=(+L.it.valorApresentado||0)||(+L.valorPago||0);
+      p={ id:uid('prc'), cirurgiaId:cirId, codigo:ref.codigo||String(L.it.codigo||'').replace(/\D/g,''), nome:ref.nome||'', porte:'',
+          qtd:1, statusPlano:'Aprovado', recusadoQuando:'', motivoRecusa:'',
+          valorPrevisto:prevVal, valorPago:0, dataPagamento:'' };
+      DB.procedimentos.push(p);
+    } else return;
+    usados.add(p.id);
+    const pago=+L.valorPago||0;
+    if(!(+p.valorPrevisto||0)) p.valorPrevisto=pago;            // previsto 0 ou vazio → valor pago
+    p.valorPago=pago;
+    p.dataPagamento=L.dataPagamento || L.it.dataPagamento || todayISO();
+    p.conciliacaoId=lote.id; p.dataConciliacao=lote.dataConciliacao;
+    const glosa=Math.max(0,(+p.valorPrevisto||0)-pago);
+    lote.totalBaixado+=pago; lote.totalGlosa+=glosa; lote.aplicados++;
+    lote.itens.push({ procId:p.id, codigo:L.it.codigo, paciente:L.it.paciente,
+      valorApresentado:+L.it.valorApresentado||0, valorPago:pago, glosa, flags:L.flags.n, novo:!!L._novo });
+  });
+  lote.semBaixa=lote.linhas-lote.aplicados;
+  if(lote.aplicados){ DB.conciliacoes=DB.conciliacoes||[]; DB.conciliacoes.push(lote); save(); }
+  return lote;
+}
+const myConciliacoes=()=>(DB.conciliacoes||[]).filter(l=>l.medicoId===M()).slice().sort((a,b)=>(b.criadoEm||'').localeCompare(a.criadoEm||''));
 
 function saveCirurgia(){
   syncCirDraft();
@@ -1463,7 +1806,10 @@ function saveCirurgia(){
    ============================================================ */
 function viewPagamentos(){
   const root=$('#viewRoot');
-  const f=state.filters.pg=Object.assign({local:'',pac:'',proc:'',de:'',ate:'',status:'aberto',aging:''}, state.filters.pg||{});
+  const f=state.filters.pg=Object.assign({local:'',pac:'',proc:'',de:'',ate:'',status:'aberto',aging:'',conc:''}, state.filters.pg||{});
+  const lotes=myConciliacoes();
+  const loteSel=f.conc? lotes.find(l=>l.id===f.conc) : null;
+  if(f.conc && !loteSel) f.conc='';
   // recusa antes da cirurgia não entra em pagamentos; recusa depois da cirurgia é glosa e entra
   const all=myProcs().map(p=>({p,c:cirOf(p.cirurgiaId)})).filter(x=>x.c && situacao(x.p)!=='Recusado pelo plano');
   const pacientes=[...new Set(myCirurgias().map(c=>c.paciente).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
@@ -1471,6 +1817,7 @@ function viewPagamentos(){
 
   const ci=s=>String(s||'').toLowerCase();
   const baseFilter=({p,c})=>{
+    if(f.conc && p.conciliacaoId!==f.conc) return false;
     if(f.local){ const q=ci(f.local); if(!ci(hospName(c.hospitalId)).includes(q) && !ci(convName(c.convenioId)).includes(q)) return false; }
     if(f.pac && !ci(c.paciente).includes(ci(f.pac))) return false;
     if(f.proc){
@@ -1491,7 +1838,7 @@ function viewPagamentos(){
     if(f.status==='glosa') return s==='Glosa parcial'||s==='Glosado';
     return true;
   };
-  const applyFilters=()=>all.filter(x=>baseFilter(x)&&statusFilter(x))
+  const applyFilters=()=>all.filter(x=>baseFilter(x) && (f.conc || statusFilter(x)))
     .sort((a,b)=>(a.c.dataCirurgia||'').localeCompare(b.c.dataCirurgia||''));
 
   const agingOf = c => daysSince(c.dataCirurgia)<=90 ? 'ate90' : 'mais90';
@@ -1552,6 +1899,7 @@ function viewPagamentos(){
         <option value="todos" ${f.status==='todos'?'selected':''}>Todos</option>
       </select>
       <span class="flt-range">Cirurgia de <input type="date" id="pgde" value="${f.de||''}"> até <input type="date" id="pgate" value="${f.ate||''}"></span>
+      ${lotes.length?`<select id="pgconc"><option value="">Conciliação: todas</option>${lotes.map(l=>`<option value="${l.id}" ${f.conc===l.id?'selected':''}>${fmtDate(l.dataConciliacao)} · ${esc(l.arquivo)}</option>`).join('')}</select>`:''}
       <button class="btn btn-sm btn-ghost" id="pgclear">Limpar</button>
     </div>
     <datalist id="dlLocalPg">${localOptions().map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist>
@@ -1559,12 +1907,21 @@ function viewPagamentos(){
     <datalist id="dlProcPg">${procNames.map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist>
     <div id="pgListWrap"></div>`;
 
+  const banner=()=>{
+    if(!loteSel) return '';
+    const bx=loteSel.totalBaixado!=null?loteSel.totalBaixado:loteSel.totalPago;
+    return `<div class="card" style="border-left:4px solid var(--accent);margin-bottom:10px"><div class="card-body" style="font-size:13px">
+      <b>Conciliação ${fmtDate(loteSel.dataConciliacao)}</b> · ${esc(loteSel.arquivo)}<br>
+      PDF: apresentado <b>${money0(loteSel.totalApresentado)}</b> · pago <b>${money0(loteSel.totalPagoPDF!=null?loteSel.totalPagoPDF:bx)}</b> em ${loteSel.linhas} linha(s).
+      Baixado no sistema: <b>${money0(bx)}</b> em <b>${loteSel.aplicados}</b> procedimento(s) · glosa <b>${money0(loteSel.totalGlosa)}</b>${loteSel.semBaixa?` · <span style="color:var(--amber)">${loteSel.semBaixa} linha(s) sem baixa</span>`:''}.
+    </div></div>`;
+  };
   const paint=()=>{
     const base=applyFilters();
     const procs = f.aging ? base.filter(x=>agingOf(x.c)===f.aging) : base;
     $('#pgCards').innerHTML=kpisHtml();
     $$('#pgCards [data-card]').forEach(el=>el.onclick=()=>cardClick(el.dataset.card));
-    $('#pgListWrap').innerHTML=`
+    $('#pgListWrap').innerHTML=banner()+`
     <div class="card"><div class="card-body flush"><div class="t-wrap">
     ${procs.length?`<table><thead><tr>
       <th>Data cir.</th><th>Dias</th><th>Paciente</th><th>Convênio</th><th>Hospital</th><th>Procedimento</th>
@@ -1591,7 +1948,8 @@ function viewPagamentos(){
   const upd=(id,key,ev='input')=>{ const el=$('#'+id); el.addEventListener(ev,()=>{ f[key]=el.value; paint(); }); };
   upd('pglocal','local'); upd('pgpac','pac'); upd('pgproc','proc');
   upd('pgst','status','change'); upd('pgde','de','change'); upd('pgate','ate','change');
-  $('#pgclear').onclick=()=>{ Object.assign(f,{local:'',pac:'',proc:'',de:'',ate:'',status:'aberto',aging:''}); viewPagamentos(); };
+  { const el=$('#pgconc'); if(el) el.addEventListener('change',()=>{ f.conc=el.value; f.aging=''; if(f.conc) f.status='todos'; viewPagamentos(); }); }
+  $('#pgclear').onclick=()=>{ Object.assign(f,{local:'',pac:'',proc:'',de:'',ate:'',status:'aberto',aging:'',conc:''}); viewPagamentos(); };
   paint();
 }
 
