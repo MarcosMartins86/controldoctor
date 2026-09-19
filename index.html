@@ -357,13 +357,9 @@ function seed(){
 
   const convNames=['Amil','Bradesco Saúde','Geap','Sulamérica','Unimed','Cassi','Postal Saúde','Gama Saúde','Camed','Petrobras','Particular'];
   const cMap={};
-  const allH=Object.values(hMap);
   convNames.forEach(nome=>{
     const id=mkId('con'); cMap[nome]=id;
-    // cada convênio atende um subconjunto de hospitais
-    const atende = nome==='Particular' ? allH.slice() :
-      allH.filter((_,i)=> (i + nome.length) % 3 !== 0);
-    db.convenios.push({id,medicoId:med.id,nome,hospitalIds:atende});
+    db.convenios.push({id,medicoId:med.id,nome});
   });
 
   function cir(o,procs){
@@ -440,7 +436,6 @@ const procsOf = cirId => DB.procedimentos.filter(p=>p.cirurgiaId===cirId);
 const myProcs = () => { const ids=new Set(myCirurgias().map(c=>c.id)); return DB.procedimentos.filter(p=>ids.has(p.cirurgiaId)); };
 const myFavoritos = () => (DB.favoritos||[]).filter(f=>f.medicoId===M());
 const convName = id => (DB.convenios.find(c=>c.id===id)||{}).nome || '—';
-const convEdicao = id => (DB.convenios.find(c=>c.id===id)||{}).edicaoCbhpm || '2018';
 const hospName = id => (DB.hospitais.find(h=>h.id===id)||{}).nome || '—';
 const cirOf = id => DB.cirurgias.find(c=>c.id===id);
 
@@ -865,7 +860,6 @@ function renderCirModal(){
   const isNew = !draft.id;
   const tab = draft._tab = Math.max(1, Math.min(3, draft._tab||1));
   const convs = myConvenios(), hosps = myHospitais();
-  const convOK = draft.convenioId ? (DB.convenios.find(c=>c.id===draft.convenioId)||{}).hospitalIds||[] : null;
   const tPrev = draft.procs.reduce((s,p)=>s+(+p.valorPrevisto||0),0);
   const tPago = draft.procs.reduce((s,p)=>s+(+p.valorPago||0),0);
 
@@ -875,7 +869,6 @@ function renderCirModal(){
       <div class="full"><label>Nº prontuário</label><input id="d-pront" value="${esc(draft.prontuario||'')}" placeholder="número do prontuário no hospital"></div>
       <div><label>Convênio *</label><select id="d-conv"><option value="">Selecione...</option>${convs.map(c=>`<option value="${c.id}" ${draft.convenioId===c.id?'selected':''}>${esc(c.nome)}</option>`).join('')}</select></div>
       <div><label>Hospital *</label><select id="d-hosp"><option value="">Selecione...</option>${hosps.map(h=>`<option value="${h.id}" ${draft.hospitalId===h.id?'selected':''}>${esc(h.nome)}</option>`).join('')}</select>
-        ${convOK && draft.hospitalId && !convOK.includes(draft.hospitalId) ? `<div class="hint-txt" style="color:var(--amber)">⚠ Este convênio não está cadastrado para atender este hospital.</div>`:''}
       </div>
       <div><label>Data da solicitação</label><input id="d-dsol" type="date" value="${draft.dataSolicitacao||''}"></div>
       <div><label>Data da cirurgia *</label><input id="d-dcir" type="date" value="${draft.dataCirurgia||''}"></div>
@@ -885,7 +878,7 @@ function renderCirModal(){
     </div>`;
 
   const tab2 = ()=>`
-    <div class="hint-txt" style="margin-bottom:8px">Um procedimento CBHPM por linha · códigos da <b>CBHPM ${convEdicao(draft.convenioId)}</b>${draft.convenioId?' (edição de '+esc(convName(draft.convenioId))+')':''}. Valores e pagamentos ficam na guia “Valores e pagamento”.</div>
+    <div class="hint-txt" style="margin-bottom:8px">Um procedimento CBHPM por linha. Valores e pagamentos ficam na guia “Valores e pagamento”.</div>
     <div class="t-wrap"><table class="proc-table"><thead><tr>
       <th style="width:300px">Código / procedimento</th><th style="width:48px">Qtd</th>
       <th style="width:150px">Status plano</th><th style="width:150px">Recusado quando</th><th style="width:190px">Motivo da recusa</th><th style="width:34px"></th>
@@ -1056,7 +1049,6 @@ function cbHideDrop(){ if(_cbDrop) _cbDrop.style.display='none'; }
 
 function bindProcRows(){
   cbHideDrop();
-  const cbEd = convEdicao(draft.convenioId);   // edição CBHPM do convênio desta cirurgia
   $$('#procRows tr').forEach(tr=>{
     const i=+tr.dataset.pi;
     tr.querySelectorAll('[data-f]:not(.cb-input)').forEach(el=>{
@@ -1075,7 +1067,7 @@ function bindProcRows(){
       d.style.left=r.left+'px'; d.style.top=(r.bottom+2)+'px'; d.style.width=Math.max(r.width,260)+'px';
     };
     const show=()=>{
-      matches=cbhpmSearch(inp.value, cbEd);
+      matches=cbhpmSearch(inp.value);
       const d=cbDropEl();
       if(!matches.length){ d.style.display='none'; return; }
       d.innerHTML=matches.map((m,k)=>`<div class="cbhpm-opt ${k===hi?'hi':''}" data-k="${k}"><span class="code">${fmtCbhpm(m.codigo)}</span> — ${esc(m.nome)} <span class="hint-txt">${(m.edicoes||[]).join("/")}</span></div>`).join('');
@@ -1095,7 +1087,6 @@ function bindProcRows(){
       if(digits.length<8) return false;
       const m=CBHPM_BY_CODE[digits.slice(0,8)];
       if(!m) return false;
-      if(!cbExistsIn(m, cbEd)) toast('Código '+fmtCbhpm(m.codigo)+' não consta na CBHPM '+cbEd+' (edição do convênio)');
       setCode(m); return true;
     };
     inp.oninput=()=>{ hi=-1; show(); };
@@ -1293,7 +1284,7 @@ function aplicarOcr(r){
   if(r.convenio && r.convenio.trim()){
     const nm=r.convenio.trim();
     let cv=myConvenios().find(c=>c.nome.toLowerCase()===nm.toLowerCase());
-    if(!cv){ cv={id:uid('con'),medicoId:M(),nome:nm,hospitalIds:[]}; DB.convenios.push(cv); save(); }
+    if(!cv){ cv={id:uid('con'),medicoId:M(),nome:nm}; DB.convenios.push(cv); save(); }
     d.convenioId=cv.id;
   }
   if(r.hospital && r.hospital.trim()){
@@ -1301,7 +1292,6 @@ function aplicarOcr(r){
     let h=myHospitais().find(x=>x.nome.toLowerCase()===nm.toLowerCase());
     if(!h){ h={id:uid('hos'),medicoId:M(),nome:nm,rede:''}; DB.hospitais.push(h); save(); }
     d.hospitalId=h.id;
-    if(d.convenioId){ const cv=DB.convenios.find(c=>c.id===d.convenioId); if(cv && !(cv.hospitalIds||[]).includes(h.id)){ cv.hospitalIds=[...(cv.hospitalIds||[]),h.id]; save(); } }
   }
   const rows = (r.procedimentos||[]).map(p=>{
     const code = String(p.codigo||'').replace(/\D/g,'');
@@ -2286,7 +2276,6 @@ function viewConvenios(){
 
   const cardHtml=(cv,i)=>{
     const col=CONV_CARD_COLORS[i%CONV_CARD_COLORS.length];
-    const nHosp=(cv.hospitalIds||[]).length;
     const open=allOpen.filter(x=>x.convId===cv.id);
     const rec=open.filter(x=>x.d<=90), old=open.filter(x=>x.d>90);
     const sum=arr=>arr.reduce((s,x)=>s+x.v,0);
@@ -2301,7 +2290,6 @@ function viewConvenios(){
     return `<div class="conv-card" data-ed="${cv.id}" style="--cc:${col}">
       <div class="cc-head">
         <div class="cc-name">${esc(cv.nome)}</div>
-        <div class="cc-sub">${nHosp} ${nHosp===1?'hospital':'hospitais'} · CBHPM ${cv.edicaoCbhpm||'2018'}</div>
         <div class="cc-edit">✎ Editar</div>
       </div>
       <div class="cc-metrics">
@@ -2313,16 +2301,12 @@ function viewConvenios(){
   };
 
   const f=state.filters.convList=state.filters.convList||{q:''};
-  const matchQ=(cv,q)=>{
-    if(!q) return true;
-    if(cv.nome.toLowerCase().includes(q)) return true;
-    return (cv.hospitalIds||[]).map(hospName).join(' ').toLowerCase().includes(q);
-  };
+  const matchQ=(cv,q)=>!q || cv.nome.toLowerCase().includes(q);
 
   root.innerHTML=`
     <div class="page-head"><div><h1>Convênios</h1><p>${convs.length} convênio(s) · procedimentos a receber por faixa de tempo desde a cirurgia</p></div>
       <button class="btn btn-primary" style="width:auto" id="novo">+ Novo convênio</button></div>
-    <div class="toolbar"><input class="search" id="cvq" style="min-width:300px" placeholder="Buscar por convênio ou hospital..." value="${esc(f.q)}"></div>
+    <div class="toolbar"><input class="search" id="cvq" style="min-width:300px" placeholder="Buscar convênio..." value="${esc(f.q)}"></div>
     <div id="convListWrap"></div>`;
 
   const paint=()=>{
@@ -2338,20 +2322,12 @@ function viewConvenios(){
   paint();
 }
 function editConvenio(id){
-  const cv=id?DB.convenios.find(c=>c.id===id):{id:null,nome:'',hospitalIds:[]};
-  const sel=new Set(cv.hospitalIds||[]);
-  const hs=myHospitais();
+  const cv=id?DB.convenios.find(c=>c.id===id):{id:null,nome:''};
   $('#modal-root').innerHTML=`
-  <div class="overlay" id="ov"><div class="modal" style="max-width:560px">
+  <div class="overlay" id="ov"><div class="modal" style="max-width:460px">
     <div class="modal-head"><h3>${id?'Editar convênio':'Novo convênio'}</h3><button class="x-btn" id="mx">&times;</button></div>
     <div class="modal-body">
       <div class="field"><label>Nome do convênio *</label><input id="c-nome" value="${esc(cv.nome)}"></div>
-      <div class="field"><label>Edição da tabela CBHPM usada por este convênio</label>
-        <select id="c-ed">${CBHPM_EDICOES.map(y=>`<option value="${y}" ${(cv.edicaoCbhpm||'2018')===y?'selected':''}>CBHPM ${y}</option>`).join('')}</select>
-        <div class="hint-txt">Define quais códigos aparecem ao lançar procedimentos nas cirurgias deste convênio.</div>
-      </div>
-      <label style="font-size:12px;font-weight:600;color:var(--muted);margin:6px 0 6px;display:block">Hospitais atendidos por este convênio</label>
-      ${hs.length?`<div class="checks">${hs.map(h=>`<label><input type="checkbox" value="${h.id}" ${sel.has(h.id)?'checked':''}> ${esc(h.nome)}</label>`).join('')}</div>`:`<div class="hint-txt">Cadastre hospitais primeiro na aba Hospitais.</div>`}
     </div>
     <div class="modal-foot">
       ${id?`<button class="btn btn-danger" id="del" style="margin-right:auto">Excluir</button>`:''}
@@ -2367,10 +2343,8 @@ function editConvenio(id){
   };
   $('#msave').onclick=()=>{
     const nome=$('#c-nome').value.trim(); if(!nome) return toast('Informe o nome');
-    const ids=$$('.checks input:checked').map(i=>i.value);
-    const ed=$('#c-ed').value;
-    if(id){ const c=DB.convenios.find(x=>x.id===id); c.nome=nome; c.hospitalIds=ids; c.edicaoCbhpm=ed; }
-    else DB.convenios.push({id:uid('con'),medicoId:M(),nome,hospitalIds:ids,edicaoCbhpm:ed});
+    if(id){ const c=DB.convenios.find(x=>x.id===id); c.nome=nome; }
+    else DB.convenios.push({id:uid('con'),medicoId:M(),nome});
     save(); close(); toast('Convênio salvo'); render();
   };
 }
@@ -2381,7 +2355,6 @@ function editConvenio(id){
 function viewHospitais(){
   const root=$('#viewRoot');
   const hs=myHospitais();
-  const convs=myConvenios();
   const cirById={}; myCirurgias().forEach(c=>cirById[c.id]=c);
   const allOpen=myProcs().filter(p=>saldoAberto(p)>0).map(p=>{
     const c=cirById[p.cirurgiaId]||{};
@@ -2393,11 +2366,6 @@ function viewHospitais(){
     const open=allOpen.filter(x=>x.hospId===h.id);
     const rec=open.filter(x=>x.d<=90), old=open.filter(x=>x.d>90);
     const sum=arr=>arr.reduce((s,x)=>s+x.v,0);
-    const ligados=convs.filter(cv=>(cv.hospitalIds||[]).includes(h.id));
-    const tags = ligados.length
-      ? ligados.slice(0,5).map(cv=>`<span class="cc-tag">${esc(cv.nome)}</span>`).join('')
-        + (ligados.length>5?`<span class="cc-tag">+${ligados.length-5}</span>`:'')
-      : `<span class="cc-tag">nenhum convênio vinculado</span>`;
     const metric=(label,color,n,v)=>`
       <div class="cc-metric">
         <div class="mbar" style="background:${color}"></div>
@@ -2410,7 +2378,6 @@ function viewHospitais(){
       <div class="cc-head">
         <div class="cc-name">${esc(h.nome)}</div>
         <div class="cc-sub">${esc(h.rede||'sem rede')}</div>
-        <div class="cc-tags" title="Convênios que atendem neste hospital">${tags}</div>
       </div>
       <div class="cc-metrics">
         ${metric('Procedimentos a receber total','#eab308',open.length,sum(open))}
@@ -2421,17 +2388,12 @@ function viewHospitais(){
   };
 
   const f=state.filters.hospList=state.filters.hospList||{q:''};
-  const matchQ=(h,q)=>{
-    if(!q) return true;
-    if(h.nome.toLowerCase().includes(q)) return true;
-    if((h.rede||'').toLowerCase().includes(q)) return true;
-    return convs.filter(cv=>(cv.hospitalIds||[]).includes(h.id)).map(cv=>cv.nome).join(' ').toLowerCase().includes(q);
-  };
+  const matchQ=(h,q)=>!q || h.nome.toLowerCase().includes(q) || (h.rede||'').toLowerCase().includes(q);
 
   root.innerHTML=`
     <div class="page-head"><div><h1>Hospitais</h1><p>${hs.length} hospital(is) · procedimentos a receber por faixa de tempo desde a cirurgia</p></div>
       <button class="btn btn-primary" style="width:auto" id="novo">+ Novo hospital</button></div>
-    <div class="toolbar"><input class="search" id="hqs" style="min-width:300px" placeholder="Buscar por hospital ou convênio..." value="${esc(f.q)}"></div>
+    <div class="toolbar"><input class="search" id="hqs" style="min-width:300px" placeholder="Buscar por hospital ou rede..." value="${esc(f.q)}"></div>
     <div id="hospListWrap"></div>`;
 
   const paint=()=>{
@@ -2448,23 +2410,13 @@ function viewHospitais(){
 }
 function editHospital(id){
   const h=id?DB.hospitais.find(x=>x.id===id):{id:null,nome:'',rede:''};
-  const sel=new Set(id ? myConvenios().filter(cv=>(cv.hospitalIds||[]).includes(id)).map(cv=>cv.id) : []);
 
   $('#modal-root').innerHTML=`
-  <div class="overlay" id="ov"><div class="modal" style="max-width:480px">
+  <div class="overlay" id="ov"><div class="modal" style="max-width:460px">
     <div class="modal-head"><h3>${id?'Editar hospital':'Novo hospital'}</h3><button class="x-btn" id="mx">&times;</button></div>
     <div class="modal-body">
       <div class="field"><label>Nome do hospital *</label><input id="h-nome" value="${esc(h.nome)}"></div>
       <div class="field"><label>Rede / grupo</label><input id="h-rede" value="${esc(h.rede||'')}" placeholder="Ex.: Rede Cirúrgica, Unimed..."></div>
-      <div class="field">
-        <label>Convênios que atendem neste hospital</label>
-        <div id="cvChips" style="margin-bottom:6px"></div>
-        <div class="cbhpm-cell">
-          <input id="cvInput" placeholder="Digite para buscar um convênio..." autocomplete="off">
-          <div class="cbhpm-drop" id="cvDrop" style="display:none"></div>
-        </div>
-        <button class="btn btn-sm" id="cvNew" type="button" style="margin-top:8px">+ Novo convênio</button>
-      </div>
     </div>
     <div class="modal-foot">
       ${id?`<button class="btn btn-danger" id="del" style="margin-right:auto">Excluir</button>`:''}
@@ -2475,65 +2427,16 @@ function editHospital(id){
   const close=()=>$('#modal-root').innerHTML='';
   $('#ov').onclick=e=>{if(e.target.id==='ov')close();};$('#mx').onclick=close;$('#mcancel').onclick=close;
 
-  const input=$('#cvInput'), drop=$('#cvDrop');
-  const hideDrop=()=>{ drop.style.display='none'; };
-  const paintChips=()=>{
-    const chips=[...sel].map(cid=>{
-      const cv=DB.convenios.find(c=>c.id===cid); if(!cv) return '';
-      return `<span class="chip">${esc(cv.nome)}<button type="button" data-rm="${cid}" style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:15px;line-height:1;padding:0 0 0 3px">&times;</button></span>`;
-    }).join('');
-    $('#cvChips').innerHTML = chips || `<span class="hint-txt">Nenhum convênio vinculado ainda.</span>`;
-    $$('#cvChips [data-rm]').forEach(b=>b.onclick=()=>{ sel.delete(b.dataset.rm); paintChips(); });
-  };
-  const addConv=cid=>{ sel.add(cid); input.value=''; hideDrop(); paintChips(); input.focus(); };
-  const createConv=nome=>{
-    nome=(nome||'').trim(); if(!nome) return toast('Digite o nome do convênio');
-    let cv=myConvenios().find(c=>c.nome.toLowerCase()===nome.toLowerCase());
-    if(!cv){ cv={id:uid('con'),medicoId:M(),nome,hospitalIds:[]}; DB.convenios.push(cv); save(); toast('Convênio “'+nome+'” criado'); }
-    addConv(cv.id);
-  };
-  const showMatches=()=>{
-    const q=input.value.trim().toLowerCase();
-    const list=myConvenios().filter(cv=>!sel.has(cv.id) && (!q || cv.nome.toLowerCase().includes(q)));
-    const exact=myConvenios().some(cv=>cv.nome.toLowerCase()===q);
-    let html=list.slice(0,30).map(cv=>`<div class="cbhpm-opt" data-add="${cv.id}">${esc(cv.nome)}</div>`).join('');
-    if(q && !exact) html+=`<div class="cbhpm-opt" data-create="1"><span class="code">＋</span> Criar convênio “${esc(input.value.trim())}”</div>`;
-    if(!html){ hideDrop(); return; }
-    drop.innerHTML=html; drop.style.display='block';
-    $$('#cvDrop [data-add]').forEach(o=>o.onmousedown=e=>{ e.preventDefault(); addConv(o.dataset.add); });
-    const cr=$('#cvDrop [data-create]');
-    if(cr) cr.onmousedown=e=>{ e.preventDefault(); createConv(input.value); };
-  };
-  input.oninput=showMatches;
-  input.onfocus=showMatches;
-  input.onblur=()=>setTimeout(hideDrop,150);
-  input.onkeydown=e=>{
-    if(e.key==='Enter'){ e.preventDefault();
-      const q=input.value.trim().toLowerCase();
-      const m=myConvenios().find(cv=>cv.nome.toLowerCase()===q && !sel.has(cv.id));
-      if(m) addConv(m.id); else if(q) createConv(input.value);
-    } else if(e.key==='Escape') hideDrop();
-  };
-  $('#cvNew').onclick=()=>{ if(input.value.trim()) createConv(input.value); else input.focus(); };
-  paintChips();
-
   if($('#del'))$('#del').onclick=()=>{
     if(myCirurgias().some(c=>c.hospitalId===id)) return toast('Há cirurgias neste hospital — não é possível excluir');
     DB.hospitais=DB.hospitais.filter(x=>x.id!==id);
-    DB.convenios.forEach(c=>c.hospitalIds=(c.hospitalIds||[]).filter(x=>x!==id));
     save(); close(); toast('Hospital excluído'); render();
   };
   $('#msave').onclick=()=>{
     const nome=$('#h-nome').value.trim(); if(!nome) return toast('Informe o nome');
     const rede=$('#h-rede').value.trim();
-    let hid=id;
     if(id){ const x=DB.hospitais.find(z=>z.id===id); x.nome=nome; x.rede=rede; }
-    else { hid=uid('hos'); DB.hospitais.push({id:hid,medicoId:M(),nome,rede}); }
-    myConvenios().forEach(cv=>{
-      const has=(cv.hospitalIds||[]).includes(hid), want=sel.has(cv.id);
-      if(want && !has) cv.hospitalIds=[...(cv.hospitalIds||[]),hid];
-      else if(!want && has) cv.hospitalIds=cv.hospitalIds.filter(x=>x!==hid);
-    });
+    else DB.hospitais.push({id:uid('hos'),medicoId:M(),nome,rede});
     save(); close(); toast('Hospital salvo'); render();
   };
 }
