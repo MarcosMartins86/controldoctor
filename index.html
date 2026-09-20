@@ -926,7 +926,7 @@ function renderCirModal(){
   <div class="overlay" id="ov">
     <div class="modal lg">
       <div class="modal-head">
-        <h3>${isNew?'Nova cirurgia':'Cirurgia — '+esc(draft.paciente||'')}</h3>
+        <h3>${isNew?'Novo procedimento':'Procedimento — '+esc(draft.paciente||'')}</h3>
         <button class="x-btn" id="mx">&times;</button>
       </div>
       <div class="modal-body">
@@ -936,7 +936,7 @@ function renderCirModal(){
         <div id="tabBody">${body}</div>
       </div>
       <div class="modal-foot">
-        ${!isNew?`<button class="btn btn-danger" id="delCir" style="margin-right:auto">Excluir cirurgia</button>`:''}
+        ${!isNew?`<button class="btn btn-danger" id="delCir" style="margin-right:auto">Excluir procedimento</button>`:''}
         ${tab>1?`<button class="btn" id="prevTab">← Anterior</button>`:''}
         ${tab<3?`<button class="btn" id="nextTab">Próxima →</button>`:''}
         <button class="btn" id="mcancel">Cancelar</button>
@@ -956,10 +956,10 @@ function renderCirModal(){
   if($('#ocrBtn')) $('#ocrBtn').onclick=openOcrImport;   // OCR oculto nesta versão
   $('#msave').onclick=saveCirurgia;
   if($('#delCir')) $('#delCir').onclick=()=>{
-    if(!confirm('Excluir esta cirurgia e seus procedimentos?')) return;
+    if(!confirm('Excluir este procedimento e todos os itens/pagamentos vinculados?')) return;
     DB.cirurgias=DB.cirurgias.filter(c=>c.id!==draft.id);
     DB.procedimentos=DB.procedimentos.filter(p=>p.cirurgiaId!==draft.id);
-    save(); close(); toast('Cirurgia excluída'); render();
+    save(); close(); toast('Procedimento excluído'); render();
   };
 
   if(tab===1){
@@ -1063,6 +1063,14 @@ function bindProcRows(){
     };
     const inp=tr.querySelector('.cb-input');
     let hi=-1, matches=[];
+    // true enquanto um re-render é disparado por uma resolução desta própria
+    // linha (clique na sugestão / Enter) com o campo ainda focado: trocar o
+    // innerHTML do modal remove esse input focado, e o navegador dispara um
+    // blur "fantasma" nele — sem essa trava, esse blur reentrante via o texto
+    // digitado (ainda não formatado) como "não resolvido" e apagava o código
+    // que acabara de ser gravado (some silenciosamente, só aparecia ao
+    // adicionar outro procedimento e a tela redesenhar de novo).
+    let settling=false;
     const place=()=>{ const d=cbDropEl(), r=inp.getBoundingClientRect();
       d.style.left=r.left+'px'; d.style.top=(r.bottom+2)+'px'; d.style.width=Math.max(r.width,260)+'px';
     };
@@ -1080,7 +1088,7 @@ function bindProcRows(){
       const mh=mediaPagaHistorica(p.codigo, draft.convenioId, draft.papel, p.id);
       if(mh && ((+p.valorPrevisto||0)===0 || p._autoPrev)){ p.valorPrevisto=mh.media; p._autoPrev=true; }
     };
-    const pick=k=>{ const m=matches[k]; if(!m) return; setCode(m); cbHideDrop(); renderCirModal(); };
+    const pick=k=>{ const m=matches[k]; if(!m) return; setCode(m); cbHideDrop(); settling=true; renderCirModal(); };
     /* resolve o texto digitado (código só números) mesmo sem escolher da lista */
     const resolveTyped=()=>{
       const digits=inp.value.replace(/\D/g,'');
@@ -1093,12 +1101,15 @@ function bindProcRows(){
     inp.onfocus=show;
     inp.onblur=()=>{
       setTimeout(cbHideDrop,180);
+      if(settling){ settling=false; return; }  // blur disparado pelo próprio re-render — a escolha já foi aplicada
       const p=draft.procs[i], txt=inp.value.trim();
       if(!txt){ if(p.codigo){ p.codigo='';p.nome='';p.porte=''; renderCirModal(); } return; }
       const expected = p.codigo ? (fmtCbhpm(p.codigo)+' — '+p.nome) : '__none__';
       if(txt===expected) return;                       // já resolvido, sem alteração
       if(resolveTyped()){ renderCirModal(); return; }   // resolveu pelo código digitado (8 números)
-      if(p.codigo){ p.codigo='';p.nome='';p.porte=''; }
+      // não resolveu: NÃO apaga um código já confirmado por causa de texto digitado
+      // que não bateu com nada — só avisa; o campo volta a mostrar o valor
+      // confirmado na próxima renderização desta guia.
       toast('Escolha o procedimento na lista ou digite o código completo (8 números)');
     };
     inp.onkeydown=e=>{
@@ -1106,7 +1117,7 @@ function bindProcRows(){
         e.preventDefault();
         if(hi>=0 && matches[hi]) return pick(hi);
         if(matches.length===1) return pick(0);
-        if(resolveTyped()){ cbHideDrop(); renderCirModal(); }
+        if(resolveTyped()){ settling=true; cbHideDrop(); renderCirModal(); }
         return;
       }
       if(!_cbDrop || _cbDrop.style.display==='none') return;
@@ -1788,7 +1799,7 @@ function saveCirurgia(){
       valorPrevisto:+p.valorPrevisto||0,valorPago:+p.valorPago||0,dataPagamento:p.dataPagamento||''
     });
   });
-  save(); $('#modal-root').innerHTML=''; toast('Cirurgia salva'); render();
+  save(); $('#modal-root').innerHTML=''; toast('Procedimento salvo'); render();
 }
 
 /* ============================================================
